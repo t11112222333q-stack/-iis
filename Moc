@@ -1,0 +1,384 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local CoreGui = game:GetService("CoreGui")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+------------------------------------------------------------------------
+-- CẤU HÌNH HỆ THỐNG GỐC + CONFIG QUỸ ĐẠO
+local MIN_KHOANG_CACH_AN_TOAN = 18 
+local TOC_DO_BAY = 2.2             
+local TOC_DO_CLICK = 0.05          
+local TAM_QUET_BOSS = 800          
+local DO_CAO_BAY = 6               
+local BAN_KINH_SCAN_NGUOI = 50     
+
+local isAutoFarmEnabled = false
+local farmConnection = nil      
+local clickThread = nil
+local gocQuay = 0                
+local guiName = "OmniStealth_V70_SaveLocation"
+
+-- Biến lưu vị trí và kiểm tra kẹt
+local savedCFrame = nil
+local lastBossPosition = nil
+local bossStuckTime = 0
+local IS_BOSS_STUCK = false
+------------------------------------------------------------------------
+
+-- HÀM DỌN DẸP VẬT CẢN: XÓA SẠCH "PartTangHinh" VÀ FOLDER "Núi"
+local function CleanupObstacles()
+    local bossZone = workspace:FindFirstChild("Boss Zone")
+    if bossZone then
+        local bossZoneFolder = bossZone:FindFirstChild("BOSSZONE")
+        if bossZoneFolder then
+            local nuiFolder = bossZoneFolder:FindFirstChild("Núi") or bossZoneFolder:FindFirstChild("N\195\186i")
+            if nuiFolder then nuiFolder:Destroy() end
+        end
+    end
+
+    if bossZone then
+        for _, descendant in pairs(bossZone:GetDescendants()) do
+            if descendant:IsA("BasePart") and descendant.Name == "PartTangHinh" then
+                descendant:Destroy()
+            end
+        end
+    end
+
+    local mapFolder = workspace:FindFirstChild("Map")
+    if mapFolder then
+        for _, descendant in pairs(mapFolder:GetDescendants()) do
+            if descendant:IsA("BasePart") and descendant.Name == "PartTangHinh" then
+                descendant:Destroy()
+            end
+        end
+    end
+end
+
+CleanupObstacles()
+
+------------------------------------------------------------------------
+-- KHỞI TẠO MENU TRÊN COREGUI
+if CoreGui:FindFirstChild(guiName) then CoreGui:FindFirstChild(guiName):Destroy() end
+
+local screenGui = Instance.new("ScreenGui", CoreGui)
+screenGui.Name = guiName
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 340, 0, 410) -- Tăng chiều cao để chứa thêm nút
+frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 22); frame.BorderSizePixel = 0; frame.Active = true
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(168, 85, 247); stroke.Thickness = 2
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 40); title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+title.Text = "🔮 OMNI STEALTH V7.0 (STUCK PROTECTION)"; title.Font = Enum.Font.GothamBold; title.TextSize = 11; title.TextColor3 = Color3.new(0, 1, 1)
+
+local txtStatus = Instance.new("TextLabel", frame)
+txtStatus.Size = UDim2.new(1, 0, 0, 30); txtStatus.Position = UDim2.new(0, 0, 0, 45); txtStatus.BackgroundTransparency = 1
+txtStatus.Text = "Trạng thái: Sẵn sàng..."; txtStatus.Font = Enum.Font.GothamSemibold; txtStatus.TextSize = 11; txtStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+
+local txtRadar = Instance.new("TextLabel", frame)
+txtRadar.Size = UDim2.new(1, 0, 0, 25); txtRadar.Position = UDim2.new(0, 0, 0, 70); txtRadar.BackgroundTransparency = 1
+txtRadar.Text = "Radar: Đang quét người chơi xung quanh..."; txtRadar.Font = Enum.Font.Gotham; txtRadar.TextSize = 10; txtRadar.TextColor3 = Color3.fromRGB(34, 197, 94)
+
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(0, 280, 0, 40); toggleBtn.Position = UDim2.new(0.5, -140, 0, 100)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38); toggleBtn.Text = "BẬT ULTIMATE EVASION FARM"
+toggleBtn.Font = Enum.Font.GothamBlack; toggleBtn.TextSize = 11; toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", toggleBtn)
+
+-- CỤM NÚT LƯU VỊ TRÍ MỚI
+local btnSaveLoc = Instance.new("TextButton", frame)
+btnSaveLoc.Size = UDim2.new(0, 135, 0, 35); btnSaveLoc.Position = UDim2.new(0.5, -140, 0, 150)
+btnSaveLoc.BackgroundColor3 = Color3.fromRGB(234, 179, 8); btnSaveLoc.Text = "📌 LƯU VỊ TRÍ CHỜ"
+btnSaveLoc.Font = Enum.Font.GothamBold; btnSaveLoc.TextSize = 10; btnSaveLoc.TextColor3 = Color3.new(0, 0, 0)
+Instance.new("UICorner", btnSaveLoc)
+
+local btnClearLoc = Instance.new("TextButton", frame)
+btnClearLoc.Size = UDim2.new(0, 135, 0, 35); btnClearLoc.Position = UDim2.new(0.5, 5, 0, 150)
+btnClearLoc.BackgroundColor3 = Color3.fromRGB(107, 114, 128); btnClearLoc.Text = "🗑️ XÓA VỊ TRÍ"
+btnClearLoc.Font = Enum.Font.GothamBold; btnClearLoc.TextSize = 10; btnClearLoc.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btnClearLoc)
+
+local txtLocStatus = Instance.new("TextLabel", frame)
+txtLocStatus.Size = UDim2.new(1, 0, 0, 20); txtLocStatus.Position = UDim2.new(0, 0, 0, 190); txtLocStatus.BackgroundTransparency = 1
+txtLocStatus.Text = "Vị trí chờ: Chưa đặt (Sẽ lên trời nếu Boss kẹt)"; txtLocStatus.Font = Enum.Font.Gotham; txtLocStatus.TextSize = 9; txtLocStatus.TextColor3 = Color3.fromRGB(156, 163, 175)
+
+local btnEnter = Instance.new("TextButton", frame)
+btnEnter.Size = UDim2.new(0, 280, 0, 40); btnEnter.Position = UDim2.new(0.5, -140, 0, 220)
+btnEnter.BackgroundColor3 = Color3.fromRGB(16, 185, 129); btnEnter.Text = "🚪 VÀO KHU BOSS (FORCE T1)"
+btnEnter.Font = Enum.Font.GothamBlack; btnEnter.TextSize = 11; btnEnter.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btnEnter)
+
+local btnServerHop = Instance.new("TextButton", frame)
+btnServerHop.Size = UDim2.new(0, 280, 0, 40); btnServerHop.Position = UDim2.new(0.5, -140, 0, 270)
+btnServerHop.BackgroundColor3 = Color3.fromRGB(79, 70, 229); btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT"
+btnServerHop.Font = Enum.Font.GothamBlack; btnServerHop.TextSize = 11; btnServerHop.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btnServerHop)
+
+-- SYSTEM KÉO MENU (DRAG)
+local dragToggle, dragInput, dragStart, startPos
+frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = true; dragStart = input.Position; startPos = frame.Position; input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end) end end)
+frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+UIS.InputChanged:Connect(function(input) if input == dragInput and dragToggle then local delta = input.Position - dragStart; frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+
+-- XỬ LÝ CLICK NÚT LƯU VỊ TRÍ
+btnSaveLoc.MouseButton1Click:Connect(function()
+    if rootPart then
+        savedCFrame = rootPart.CFrame
+        txtLocStatus.Text = "Vị trí chờ: ĐÃ LƯU XƠN XONG! ✅"
+        txtLocStatus.TextColor3 = Color3.fromRGB(34, 197, 94)
+    end
+end)
+
+btnClearLoc.MouseButton1Click:Connect(function()
+    savedCFrame = nil
+    txtLocStatus.Text = "Vị trí chờ: Chưa đặt (Sẽ lên trời nếu Boss kẹt)"
+    txtLocStatus.TextColor3 = Color3.fromRGB(156, 163, 175)
+end)
+
+-- CHỨC NĂNG VÀO CỔNG T1
+local function EnterBossZone()
+    local t1 = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Teleport") and workspace.Map.Teleport:FindFirstChild("T1")
+    if t1 then
+        local prompt = t1:FindFirstChildOfClass("ProximityPrompt")
+        if prompt then
+            rootPart.CFrame = t1.CFrame * CFrame.new(0, 1, 0)
+            task.wait(0.2)
+            prompt.HoldDuration = 0
+            prompt.RequiresLineOfSight = false
+            prompt:InputHoldBegin()
+            prompt:Trigger()
+            prompt:InputHoldEnd()
+            task.wait(0.1)
+            prompt:InputHoldBegin()
+            prompt:Trigger()
+            prompt:InputHoldEnd()
+            return true
+        end
+    end
+    return false
+end
+btnEnter.MouseButton1Click:Connect(EnterBossZone)
+
+-- SERVER HOPPING
+local function HopToLowestServer()
+    txtStatus.Text = "Đang tìm server vắng..."
+    txtStatus.TextColor3 = Color3.fromRGB(245, 158, 11)
+    btnServerHop.Text = "ĐANG TRUY CẬP API ROBLOX..."
+    task.spawn(function()
+        local success, servers = pcall(function() return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")) end)
+        if success and servers and servers.data then
+            local bestServer = nil
+            local minPlayers = math.huge
+            for _, server in pairs(servers.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    if server.playing < minPlayers then minPlayers = server.playing; bestServer = server.id end
+                end
+            end
+            if bestServer then TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer, player) else txtStatus.Text = "Không tìm thấy server trống tốt hơn." btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT" end
+        else txtStatus.Text = "Lỗi API. Thử lại sau." btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT" end
+    end)
+end
+btnServerHop.MouseButton1Click:Connect(HopToLowestServer)
+
+-- RADAR QUÉT NGƯỜI LẠ
+local function ScanForPlayers()
+    if not rootPart then return false end
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance < BAN_KINH_SCAN_NGUOI then return true, otherPlayer.Name end
+        end
+    end
+    return false, nil
+end
+
+-- LẤY MODEL BOSS VÀ KIỂM TRA ĐIỀU KIỆN SỐNG CHÍNH XÁC
+local function GetValidBossModel()
+    local bossZone = workspace:FindFirstChild("Boss Zone")
+    local bossModel = bossZone and bossZone:FindFirstChild("Boss")
+    if bossModel and bossModel:IsA("Model") then
+        local bHumanoid = bossModel:FindFirstChildOfClass("Humanoid")
+        if bHumanoid and bHumanoid.Health > 0 then
+            return bossModel
+        end
+    end
+    return nil
+end
+
+-- LUỒNG TỰ CLICK ĐÁNH
+local function StartClickThread()
+    if clickThread then task.cancel(clickThread) end
+    clickThread = task.spawn(function()
+        while isAutoFarmEnabled do
+            task.wait(TOC_DO_CLICK)
+            if GetValidBossModel() and character:FindFirstChildOfClass("Tool") then
+                character:FindFirstChildOfClass("Tool"):Activate()
+            end
+        end
+    end)
+end
+
+-- ANTI-AFK
+player.Idled:Connect(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
+
+-- VÒNG LẶP ENGINE FARM CHÍNH
+local function StartMainFarmLoop()
+    if farmConnection then farmConnection:Disconnect() end
+    StartClickThread()
+    
+    farmConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not isAutoFarmEnabled or not rootPart or not humanoid then return end
+        
+        -- 1. KIỂM TRA RADAR NGƯỜI CHƠI LẠ
+        local playerDetected, detectorName = ScanForPlayers()
+        if playerDetected then
+            isAutoFarmEnabled = false
+            txtRadar.Text = "⚠️ PHÁT HIỆN: [".. detectorName .."]! ĐANG CHẠY TRỐN..."
+            txtRadar.TextColor3 = Color3.fromRGB(239, 68, 68)
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38); toggleBtn.Text = "BẬT ULTIMATE EVASION FARM"
+            if farmConnection then farmConnection:Disconnect() end
+            if clickThread then task.cancel(clickThread) end
+            if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+            HopToLowestServer()
+            return
+        else
+            txtRadar.Text = "🟢 Radar an toàn (Không có người chơi khác lại gần)"
+            txtRadar.TextColor3 = Color3.fromRGB(34, 197, 94)
+        end
+        
+        -- 2. ENGINE PHÂN TÍCH DI CHUYỂN CỦA BOSS TRÁNH KẸT
+        local bossModel = GetValidBossModel()
+        if bossModel then
+            local bossTargetPart = bossModel:FindFirstChild("Hitbox") or bossModel:FindFirstChild("HumanoidRootPart") or bossModel.PrimaryPart
+            
+            if bossTargetPart then
+                -- Thuật toán check xem boss đứng yên hay di chuyển
+                if lastBossPosition then
+                    local moveDistance = (bossTargetPart.Position - lastBossPosition).Magnitude
+                    if moveDistance < 0.2 then -- Boss di chuyển cực ít hoặc đứng yên
+                        bossStuckTime = bossStuckTime + deltaTime
+                        if bossStuckTime >= 3.0 then -- Đứng yên quá 3 giây coi như bị kẹt
+                            IS_BOSS_STUCK = true
+                        end
+                    else
+                        bossStuckTime = 0
+                        IS_BOSS_STUCK = false
+                    end
+                end
+                lastBossPosition = bossTargetPart.Position
+                
+                --------------------------------------------------------
+                -- XỬ LÝ DI CHUYỂN DỰA TRÊN TRẠNG THÁI CỦA BOSS
+                if IS_BOSS_STUCK then
+                    -- NẾU BOSS BỊ KẸT: Né về vị trí đã lưu để đợi
+                    txtStatus.Text = "⚠️ BOSS ĐANG ĐỨNG YÊN / KẸT! NÉ VỀ VỊ TRÍ CHỜ..."
+                    txtStatus.TextColor3 = Color3.fromRGB(251, 191, 36)
+                    
+                    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                    
+                    if savedCFrame then
+                        -- Bay về điểm bạn đã tự tay bấm lưu lúc nãy
+                        rootPart.CFrame = CFrame.lookAt(savedCFrame.Position, bossTargetPart.Position)
+                    else
+                        -- Dự phòng nếu quên chưa lưu vị trí: Treo tạm trên cao tâm Boss Zone
+                        local bossZone = workspace:FindFirstChild("Boss Zone")
+                        if bossZone then
+                            rootPart.CFrame = CFrame.lookAt(bossZone.Position + Vector3.new(0, 18, 0), bossTargetPart.Position)
+                        end
+                    end
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                else
+                    -- NẾU BOSS DI CHUYỂN BÌNH THƯỜNG: Tiếp tục bay vòng tròn và hướng mặt vào boss
+                    local banKinhHitbox = math.max(bossTargetPart.Size.X, bossTargetPart.Size.Z) / 2
+                    local banKinhBayThucTe = banKinhHitbox + MIN_KHOANG_CACH_AN_TOAN
+                    
+                    txtStatus.Text = "🎯 ORBITING BOSS: " .. bossModel.Name
+                    txtStatus.TextColor3 = Color3.fromRGB(168, 85, 247)
+                    
+                    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                    
+                    gocQuay = gocQuay + (deltaTime * TOC_DO_BAY)
+                    local targetPos = bossTargetPart.Position + Vector3.new(math.cos(gocQuay) * banKinhBayThucTe, DO_CAO_BAY, math.sin(gocQuay) * banKinhBayThucTe)
+                    
+                    rootPart.CFrame = CFrame.lookAt(targetPos, bossTargetPart.Position)
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+                --------------------------------------------------------
+            end
+        else
+            -- KHI BOSS CHẾT HOẶC CHỜ HỒI SINH
+            CleanupObstacles()
+            lastBossPosition = nil
+            bossStuckTime = 0
+            IS_BOSS_STUCK = false
+            
+            txtStatus.Text = "⏳ Đợi Boss xuất hiện / hồi sinh..."
+            txtStatus.TextColor3 = Color3.fromRGB(245, 158, 11)
+            
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            
+            -- Đứng chờ tại vị trí đã lưu nếu có, không thì đứng ở tâm map trên cao
+            if savedCFrame then
+                rootPart.CFrame = savedCFrame
+            else
+                local bossZone = workspace:FindFirstChild("Boss Zone")
+                if bossZone then
+                    rootPart.CFrame = CFrame.new(bossZone.Position + Vector3.new(0, 16, 0))
+                else
+                    EnterBossZone()
+                    task.wait(1.0)
+                end
+            end
+            rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end)
+end
+
+-- HÀM XỬ LÝ BẬT/TẮT VÀ TỰ ĐỘNG REBOOT KHI QUA CỔNG
+local function ExecuteToggle(forceState)
+    if forceState ~= nil then isAutoFarmEnabled = forceState else isAutoFarmEnabled = not isAutoFarmEnabled end
+    
+    if isAutoFarmEnabled then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(22, 163, 74); toggleBtn.Text = "TẮT HỆ THỐNG FARM"
+        txtStatus.Text = "Trạng thái: Đang kết nối mục tiêu..."; txtStatus.TextColor3 = Color3.fromRGB(34, 197, 94)
+        
+        local hasZone = workspace:FindFirstChild("Boss Zone")
+        if not hasZone then
+            EnterBossZone()
+            task.spawn(function()
+                txtStatus.Text = "🔄 Đang tự động kích hoạt lại hệ thống..."; txtStatus.TextColor3 = Color3.fromRGB(251, 191, 36)
+                task.wait(0.8) 
+                if isAutoFarmEnabled then
+                    ExecuteToggle(false)
+                    task.wait(0.1)
+                    ExecuteToggle(true)
+                end
+            end)
+            return 
+        end
+        StartMainFarmLoop()
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38); toggleBtn.Text = "BẬT ULTIMATE EVASION FARM"
+        txtStatus.Text = "Trạng thái: Đang tắt..."; txtStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+        if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        if farmConnection then farmConnection:Disconnect() farmConnection = nil end
+        if clickThread then task.cancel(clickThread) clickThread = nil end
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function() ExecuteToggle(nil) end)
+player.CharacterAdded:Connect(function(char) character = char; rootPart = char:WaitForChild("HumanoidRootPart"); humanoid = char:WaitForChild("Humanoid") end)
+
