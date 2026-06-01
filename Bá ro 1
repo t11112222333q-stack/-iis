@@ -12,19 +12,19 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 
 ------------------------------------------------------------------------
--- CẤU HÌNH HỆ THỐNG
-local MIN_KHOANG_CACH_AN_TOAN = 18 -- Khoảng cách an toàn ngoài rìa Hitbox Boss
-local TOC_DO_BAY = 2.2             -- Tốc độ lướt vòng tròn quanh Boss
-local TOC_DO_CLICK = 0.05          -- Tốc độ tự động đánh
-local TAM_QUET_BOSS = 800          -- Bán kính tìm kiếm Boss
-local DO_CAO_BAY = 6               -- Độ cao bay để né chiêu mặt đất
-local BAN_KINH_SCAN_NGUOI = 50     -- Thấy người lạ trong vòng 50m là đổi SV ngay
+-- CẤU HÌNH HỆ THỐNG GỐC + KHỬ LỖI KẸT TƯỜNG
+local MIN_KHOANG_CACH_AN_TOAN = 18 -- Khoảng cách ngoài rìa Hitbox Boss
+local TOC_DO_BAY = 2.2             -- Tốc độ lướt vòng tròn
+local TOC_DO_CLICK = 0.05          -- Tốc độ click đánh
+local TAM_QUET_BOSS = 800          
+local DO_CAO_BAY = 6               -- Độ cao mặc định để né chiêu mặt đất
+local BAN_KINH_SCAN_NGUOI = 50     
 
 local isAutoFarmEnabled = false
 local farmConnection = nil      
 local clickThread = nil
 local gocQuay = 0                
-local guiName = "OmniStealth_V50_AutoToggleFix"
+local guiName = "OmniStealth_V50_WallAndDeathFix"
 ------------------------------------------------------------------------
 
 -- KHỞI TẠO MENU TRÊN COREGUI
@@ -44,7 +44,7 @@ stroke.Color = Color3.fromRGB(168, 85, 247); stroke.Thickness = 2
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 40); title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-title.Text = "MEMAYBEO HUB(AUTO TOGGLE)"; title.Font = Enum.Font.GothamBold; title.TextSize = 11; title.TextColor3 = Color3.new(0, 1, 1)
+title.Text = "🔮 OMNI STEALTH V5.0 (WALL & DEATH FIX)"; title.Font = Enum.Font.GothamBold; title.TextSize = 11; title.TextColor3 = Color3.new(0, 1, 1)
 
 local txtStatus = Instance.new("TextLabel", frame)
 txtStatus.Size = UDim2.new(1, 0, 0, 30); txtStatus.Position = UDim2.new(0, 0, 0, 50); txtStatus.BackgroundTransparency = 1
@@ -72,13 +72,13 @@ btnServerHop.BackgroundColor3 = Color3.fromRGB(79, 70, 229); btnServerHop.Text =
 btnServerHop.Font = Enum.Font.GothamBlack; btnServerHop.TextSize = 11; btnServerHop.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", btnServerHop)
 
--- HỆ THỐNG KÉO MENU (DRAG)
+-- DRAG MENU
 local dragToggle, dragInput, dragStart, startPos
 frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = true; dragStart = input.Position; startPos = frame.Position; input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end) end end)
 frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
 UIS.InputChanged:Connect(function(input) if input == dragInput and dragToggle then local delta = input.Position - dragStart; frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
--- CHỨC NĂNG VÀO CỔNG T1
+-- DỊCH CHUYỂN CỔNG T1
 local function EnterBossZone()
     local t1 = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Teleport") and workspace.Map.Teleport:FindFirstChild("T1")
     if t1 then
@@ -88,7 +88,6 @@ local function EnterBossZone()
             task.wait(0.2)
             prompt.HoldDuration = 0
             prompt.RequiresLineOfSight = false
-            
             prompt:InputHoldBegin()
             prompt:Trigger()
             prompt:InputHoldEnd()
@@ -101,20 +100,15 @@ local function EnterBossZone()
     end
     return false
 end
-
 btnEnter.MouseButton1Click:Connect(EnterBossZone)
 
--- CHỨC NĂNG SERVER HOPPING
+-- SERVER HOP
 local function HopToLowestServer()
     txtStatus.Text = "Đang tìm server vắng để lẩn trốn..."
     txtStatus.TextColor3 = Color3.fromRGB(245, 158, 11)
     btnServerHop.Text = "ĐANG TRUY CẬP API ROBLOX..."
-    
     task.spawn(function()
-        local success, servers = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-        end)
-        
+        local success, servers = pcall(function() return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")) end)
         if success and servers and servers.data then
             local bestServer = nil
             local minPlayers = math.huge
@@ -123,41 +117,37 @@ local function HopToLowestServer()
                     if server.playing < minPlayers then minPlayers = server.playing; bestServer = server.id end
                 end
             end
-            if bestServer then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer, player)
-            else
-                txtStatus.Text = "Không tìm thấy server trống tốt hơn."
-                btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT"
-            end
-        else
-            txtStatus.Text = "Lỗi API. Thử lại sau."
-            btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT"
-        end
+            if bestServer then TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer, player) else txtStatus.Text = "Không tìm thấy server trống tốt hơn." btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT" end
+        else txtStatus.Text = "Lỗi API. Thử lại sau." btnServerHop.Text = "⚡ ĐỔI SANG SERVER ÍT NGƯỜI NHẤT" end
     end)
 end
-
 btnServerHop.MouseButton1Click:Connect(HopToLowestServer)
 
--- RADAR QUÉT NGƯỜI LẠ XUNG QUANH
+-- RADAR
 local function ScanForPlayers()
     if not rootPart then return false end
     for _, otherPlayer in pairs(Players:GetPlayers()) do
         if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
-            if distance < BAN_KINH_SCAN_NGUOI then
-                return true, otherPlayer.Name
-            end
+            if distance < BAN_KINH_SCAN_NGUOI then return true, otherPlayer.Name end
         end
     end
     return false, nil
 end
 
--- TÌM KIẾM BOSS
+-- TÌM BOSS VÀ KIỂM TRA ĐIỀU KIỆN SỐNG (FIX LỖI BOSS CHẾT VẪN BAY)
 local function FindNearestBoss()
     if not rootPart then return nil end
     local bossZone = workspace:FindFirstChild("Boss Zone")
     local bossModel = bossZone and bossZone:FindFirstChild("Boss")
+    
     if bossModel then
+        -- Kiểm tra máu của Boss (Nếu có Humanoid)
+        local bHumanoid = bossModel:FindFirstChildOfClass("Humanoid")
+        if bHumanoid and bHumanoid.Health <= 0 then
+            return nil -- Boss chết rồi thì coi như không tìm thấy mục tiêu
+        end
+        
         local targetPart = bossModel:FindFirstChild("Hitbox") or bossModel:FindFirstChild("HumanoidRootPart")
         if targetPart and targetPart:IsA("BasePart") then
             return targetPart
@@ -166,26 +156,24 @@ local function FindNearestBoss()
     return nil
 end
 
--- LUỒNG TỰ CLICK VŨ KHÍ TÁCH BIỆT
+-- LUỒNG CLICK TỰ ĐỘNG
 local function StartClickThread()
     if clickThread then task.cancel(clickThread) end
     clickThread = task.spawn(function()
         while isAutoFarmEnabled do
             task.wait(TOC_DO_CLICK)
-            if character:FindFirstChildOfClass("Tool") then
+            -- Chỉ bấm click khi có mục tiêu Boss sống để tránh bug vũ khí
+            if FindNearestBoss() and character:FindFirstChildOfClass("Tool") then
                 character:FindFirstChildOfClass("Tool"):Activate()
             end
         end
     end)
 end
 
--- ANTI-AFK TREO MÁY
-player.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
-end)
+-- ANTI-AFK
+player.Idled:Connect(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
 
--- VÒNG LẶP ENGINE FARM CHÍNH
+-- VÒNG LẶP CHÍNH (FIX LỖI KẸT TƯỜNG + BOSS CHẾT)
 local function StartMainFarmLoop()
     if farmConnection then farmConnection:Disconnect() end
     StartClickThread()
@@ -193,7 +181,7 @@ local function StartMainFarmLoop()
     farmConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isAutoFarmEnabled or not rootPart or not humanoid then return end
         
-        -- 1. KIỂM TRA RADAR
+        -- 1. KIỂM TRA RADAR NGƯỜI CHƠI LẠ
         local playerDetected, detectorName = ScanForPlayers()
         if playerDetected then
             isAutoFarmEnabled = false
@@ -210,7 +198,7 @@ local function StartMainFarmLoop()
             txtRadar.TextColor3 = Color3.fromRGB(34, 197, 94)
         end
         
-        -- 2. LUỒNG DI CHUYỂN QUỸ ĐẠO QUANH HITBOX BOSS
+        -- 2. LUỒNG TÍNH TOÁN DI CHUYỂN QUỸ ĐẠO
         local bossTarget = FindNearestBoss()
         if bossTarget then
             local banKinhHitbox = math.max(bossTarget.Size.X, bossTarget.Size.Z) / 2
@@ -224,14 +212,38 @@ local function StartMainFarmLoop()
             gocQuay = gocQuay + (deltaTime * TOC_DO_BAY)
             local targetPos = bossTarget.Position + Vector3.new(math.cos(gocQuay) * banKinhBayThucTe, DO_CAO_BAY, math.sin(gocQuay) * banKinhBayThucTe)
             
+            -- HỆ THỐNG KIỂM TRA NÉ TƯỜNG (RAYCASTING ANTI-WALL BUMP)
+            local rayOrigin = bossTarget.Position
+            local rayDirection = (targetPos - bossTarget.Position)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            raycastParams.FilterDescendantsInstances = {character, bossTarget.Parent} -- Bỏ qua bản thân và Boss
+            
+            local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+            if raycastResult then
+                -- Nếu phát hiện đâm vào tường, ép nhân vật đứng dịch vào trong điểm va chạm 2 mét và nâng độ cao lên để thoát kẹt
+                targetPos = raycastResult.Position + (raycastResult.Normal * 2) + Vector3.new(0, 4, 0)
+            end
+            
+            -- Áp vị trí CFrame mượt mà
             rootPart.CFrame = CFrame.lookAt(targetPos, bossTarget.Position)
             rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
         else
-            txtStatus.Text = "Trạng thái: Đang đợi Boss xuất hiện..."
-            txtStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+            -- KHI BOSS CHẾT HOẶC CHƯA XUẤT HIỆN: Đứng yên trên cao chờ đợi, không bay lung tung
+            txtStatus.Text = "⏳ Đợi Boss hồi sinh..."
+            txtStatus.TextColor3 = Color3.fromRGB(245, 158, 11)
             
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            
+            -- Neo giữ nhân vật đứng yên lơ lửng an toàn tại khu Boss Zone
             local bossZone = workspace:FindFirstChild("Boss Zone")
-            if not bossZone or not bossZone:FindFirstChild("Boss") then
+            if bossZone then
+                -- Đứng yên ở trung tâm khu vực khu Boss, cách mặt đất 15 mét để quái thường không cắn được
+                local safeWaitPos = bossZone.Position + Vector3.new(0, 15, 0)
+                rootPart.CFrame = CFrame.new(safeWaitPos)
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            else
+                -- Nếu không tìm thấy cả khu Boss, tự bấm cổng để vào lại
                 EnterBossZone()
                 task.wait(1.0)
             end
@@ -239,55 +251,37 @@ local function StartMainFarmLoop()
     end)
 end
 
--- HÀM XỬ LÝ BẬT/TẮT TOÀN CỤC (GẮN CO-ROUTINE TỰ ĐỘNG REBOOT KHI CHUYỂN MAP)
+-- HÀM XỬ LÝ BẬT/TẮT VÀ TỰ REBOOT KHI DỊCH CHUYỂN
 local function ExecuteToggle(forceState)
-    if forceState ~= nil then
-        isAutoFarmEnabled = forceState
-    else
-        isAutoFarmEnabled = not isAutoFarmEnabled
-    end
+    if forceState ~= nil then isAutoFarmEnabled = forceState else isAutoFarmEnabled = not isAutoFarmEnabled end
     
     if isAutoFarmEnabled then
         toggleBtn.BackgroundColor3 = Color3.fromRGB(22, 163, 74); toggleBtn.Text = "TẮT HỆ THỐNG FARM"
         txtStatus.Text = "Trạng thái: Đang kết nối mục tiêu..."; txtStatus.TextColor3 = Color3.fromRGB(34, 197, 94)
         
-        -- Nếu đang ở sảnh ngoài, dịch chuyển vào khu Boss
         local hasZone = workspace:FindFirstChild("Boss Zone")
         if not hasZone then
             EnterBossZone()
-            
-            -- CHÍNH XÁC KIỂU BẠN CẦN TẠI ĐÂY:
-            -- Sau khi dịch chuyển tới chỗ boss, script tự động "Tắt" rồi "Bật lại" sau 0.8 giây bằng code
             task.spawn(function()
                 txtStatus.Text = "🔄 Đang tự động kích hoạt lại hệ thống..."; txtStatus.TextColor3 = Color3.fromRGB(251, 191, 36)
                 task.wait(0.8) 
                 if isAutoFarmEnabled then
-                    ExecuteToggle(false) -- Lệnh Tắt bằng code
+                    ExecuteToggle(false)
                     task.wait(0.1)
-                    ExecuteToggle(true)  -- Lệnh Bật lại bằng code
+                    ExecuteToggle(true)
                 end
             end)
-            return -- Dừng luồng hiện tại để luồng "Bật lại" xử lý vật lý sạch hơn
+            return 
         end
-        
-        -- Kích hoạt công cụ farm chính
         StartMainFarmLoop()
     else
         toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38); toggleBtn.Text = "BẬT ULTIMATE EVASION FARM"
         txtStatus.Text = "Trạng thái: Đang tắt..."; txtStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
-        
         if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
-        
         if farmConnection then farmConnection:Disconnect() farmConnection = nil end
         if clickThread then task.cancel(clickThread) clickThread = nil end
     end
 end
 
--- Kết nối sự kiện click của người dùng vào hàm Toggle hệ thống
-toggleBtn.MouseButton1Click:Connect(function()
-    ExecuteToggle(nil)
-end)
-
-player.CharacterAdded:Connect(function(char)
-    character = char; rootPart = char:WaitForChild("HumanoidRootPart"); humanoid = char:WaitForChild("Humanoid")
-end)
+toggleBtn.MouseButton1Click:Connect(function() ExecuteToggle(nil) end)
+player.CharacterAdded:Connect(function(char) character = char; rootPart = char:WaitForChild("HumanoidRootPart"); humanoid = char:WaitForChild("Humanoid") end)
