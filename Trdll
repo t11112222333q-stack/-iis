@@ -323,7 +323,7 @@ Instance.new("UICorner", autoBtn).CornerRadius = UDim.new(0, 8)
 
 print("[5/6] Phân tích và thông tin đã tạo xong")
 -- ============================================================================
--- DEEP MATRIX v20.0 - PHẦN 6/6: ENGINE DỰ ĐOÁN VÀ LOG
+-- DEEP MATRIX v20.0 - PHẦN 6/6: ENGINE DỰ ĐOÁN VÀ LOG (ĐÃ SỬA ĐƯỜNG DẪN)
 -- ============================================================================
 local logFrame = Instance.new("ScrollingFrame", cont)
 logFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -372,6 +372,18 @@ end)
 
 addLog("[SYS] Deep Matrix v20 khởi động", Color3.fromRGB(34, 197, 94))
 
+-- HÀM LẤY SỐ TIỀN HIỆN TẠI
+local function getCurrentMoney()
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        local vnd = leaderstats:FindFirstChild("VND")
+        if vnd then
+            return vnd.Value
+        end
+    end
+    return 0
+end
+
 -- CẬP NHẬT UI
 local function updateUI()
     local ga, gau, emo = 0, 0, {}
@@ -386,6 +398,10 @@ local function updateUI()
     end
     countText.Text = "🐥 Gà: " .. ga .. " | 🐻 Gấu: " .. gau
     hisText.Text = #emo > 0 and "📜 Lịch sử: " .. table.concat(emo, " ") or "📜 Lịch sử: [---]"
+    
+    -- Cập nhật số tiền
+    local money = getCurrentMoney()
+    moneyText.Text = "💰 Vốn: " .. string.format("%.0f", money) .. " VND"
 end
 
 -- HÀM DỰ ĐOÁN CHÍNH
@@ -495,43 +511,77 @@ local function deepAnalysis()
     end
 end
 
--- HÀM ĐẶT CƯỢC
+-- HÀM ĐẶT CƯỢC (DÙNG ĐƯỜNG DẪN CỦA BẠN)
 local function execBet(side, amt)
     if not auto then return end
+    
+    -- Kiểm tra số dư
+    local currentMoney = getCurrentMoney()
+    if currentMoney < amt then
+        addLog("[ERROR] Không đủ tiền! Cần: " .. amt/1e6 .. "M, Có: " .. currentMoney/1e6 .. "M", Color3.fromRGB(220, 38, 38))
+        return
+    end
+    
     task.spawn(function()
         pcall(function()
-            local gg = player.PlayerGui:FindFirstChild("GaGauGui")
-            if gg and gg:FindFirstChild("FrameGaGau") then
-                local fg = gg.FrameGaGau
-                local xn = fg:FindFirstChild("XacNhan")
-                if side == "Ga" and fg:FindFirstChild("ChonGa") and fg:FindFirstChild("DienSoTienGa") then
-                    fg.ChonGa:Activate()
-                    fg.DienSoTienGa.Text = tostring(amt)
-                    fg.DienSoTienGa:ReleaseFocus(true)
-                    xn:Activate()
-                    addLog("[ORDER] Lệnh GÀ " .. amt / 1e6 .. "M", Color3.fromRGB(34, 197, 94))
-                elseif side == "Gau" and fg:FindFirstChild("ChonGau") and fg:FindFirstChild("DienSoTienGau") then
-                    fg.ChonGau:Activate()
-                    fg.DienSoTienGau.Text = tostring(amt)
-                    fg.DienSoTienGau:ReleaseFocus(true)
-                    xn:Activate()
-                    addLog("[ORDER] Lệnh GẤU " .. amt / 1e6 .. "M", Color3.fromRGB(168, 85, 247))
+            local gaGauGui = player.PlayerGui:FindFirstChild("GaGauGui")
+            if gaGauGui then
+                local frameGaGau = gaGauGui:FindFirstChild("FrameGaGau")
+                if frameGaGau then
+                    local xacNhan = frameGaGau:FindFirstChild("XacNhan")
+                    
+                    if side == "Ga" then
+                        local chonGa = frameGaGau:FindFirstChild("ChonGa")
+                        local dienSoTienGa = frameGaGau:FindFirstChild("DienSoTienGa")
+                        if chonGa and dienSoTienGa and xacNhan then
+                            chonGa:Activate()
+                            dienSoTienGa.Text = tostring(amt)
+                            dienSoTienGa:ReleaseFocus(true)
+                            task.wait(0.1)
+                            xacNhan:Activate()
+                            addLog("[ORDER] Lệnh GÀ " .. amt/1e6 .. "M", Color3.fromRGB(34, 197, 94))
+                        end
+                    elseif side == "Gau" then
+                        local chonGau = frameGaGau:FindFirstChild("ChonGau")
+                        local dienSoTienGau = frameGaGau:FindFirstChild("DienSoTienGau")
+                        if chonGau and dienSoTienGau and xacNhan then
+                            chonGau:Activate()
+                            dienSoTienGau.Text = tostring(amt)
+                            dienSoTienGau:ReleaseFocus(true)
+                            task.wait(0.1)
+                            xacNhan:Activate()
+                            addLog("[ORDER] Lệnh GẤU " .. amt/1e6 .. "M", Color3.fromRGB(168, 85, 247))
+                        end
+                    end
                 end
             end
         end)
     end)
 end
 
--- KẾT NỐI REMOTE
+-- CẬP NHẬT TIỀN ĐỊNH KỲ
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if gui and gui.Parent then
+            local money = getCurrentMoney()
+            moneyText.Text = "💰 Vốn: " .. string.format("%.0f", money) .. " VND"
+        else
+            break
+        end
+    end
+end)
+
+-- KẾT NỐI REMOTE (NẾU CÓ)
 task.spawn(function()
     local remote = RS:FindFirstChild("Remote")
     if not remote then
-        addLog("[ERR] Không tìm thấy Remote", Color3.fromRGB(220, 38, 38))
+        addLog("[INFO] Không tìm thấy Remote, vẫn có thể đặt cược thủ công", Color3.fromRGB(255, 200, 0))
         return
     end
     local upd = remote:FindFirstChild("GaGauUpdate")
     if not upd then
-        addLog("[ERR] Không tìm thấy GaGauUpdate", Color3.fromRGB(220, 38, 38))
+        addLog("[INFO] Không tìm thấy GaGauUpdate", Color3.fromRGB(255, 200, 0))
         return
     end
 
@@ -540,7 +590,6 @@ task.spawn(function()
         if act == "UpdateTotals" then
             tGa = args[1] or 0
             tGau = args[2] or 0
-            moneyText.Text = "💰 Vốn: " .. string.format("%.0f", tGa + tGau) .. " VND"
         elseif act == "Countdown" then
             local sec = args[1]
             timeText.Text = "⏱️ XUNG NHỊP: " .. sec .. "s"
@@ -649,5 +698,7 @@ if hasFile and isfile("DM_history.json") then
     end)
 end
 
+-- CẬP NHẬT TIỀN BAN ĐẦU
+updateUI()
 addLog("[READY] Deep Matrix v20 sẵn sàng! CHẠM GIỮ BẤT KỲ ĐÂU để kéo menu", Color3.fromRGB(34, 197, 94))
 print("[6/6] Hoàn tất! Menu đã sẵn sàng")
