@@ -1,190 +1,202 @@
 -- ============================================================================
--- DEEP MATRIX v20.0 - FULL MENU CHUẨN (ĐÃ FIX KÉO THẢ + NHỎ GỌN)
+-- DEEP MATRIX v20.0 - PHẦN 1/6: KHỞI TẠO VÀ CẤU HÌNH
 -- ============================================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
+local RS = game:GetService("ReplicatedStorage")
+local CG = game:GetService("CoreGui")
+local HS = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
-local targetParent = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui", 5)
+local parent = pcall(function() return CG end) and CG or player:WaitForChild("PlayerGui", 5)
 
-if CoreGui:FindFirstChild("VipProMenu") then CoreGui.VipProMenu:Destroy() end
+if CG:FindFirstChild("VipProMenu") then CG.VipProMenu:Destroy() end
 if player.PlayerGui:FindFirstChild("VipProMenu") then player.PlayerGui.VipProMenu:Destroy() end
 
-local hasFileSupport = pcall(function() return writefile end)
-local WriteFile, ReadFile
-if hasFileSupport then
-    WriteFile = writefile
-    ReadFile = readfile
+-- CẤU HÌNH CHÍNH
+local betBase = 10000000
+local betCur = 10000000
+local confThres = 70
+local winTarget = 150
+local loseMax = 3
+
+-- BIẾN TOÀN CỤC
+local history = {}
+local tGa, tGau = 0, 0
+local auto = false
+local betPlaced = false
+local lastPred = ""
+local wins = 0
+local loses = 0
+local frozen = false
+
+-- KIỂM TRA HỖ TRỢ FILE
+local hasFile = pcall(function() return writefile end)
+local WriteFile, ReadFile = writefile, readfile
+
+print("[1/6] Đã khởi tạo xong")
+-- ============================================================================
+-- DEEP MATRIX v20.0 - PHẨN 2/6: DATABASE VÀ MẠNG NƠ RON
+-- ============================================================================
+local db = {all = {}, pat = {}}
+
+local function addResult(r)
+    if not r then return end
+    table.insert(db.all, r)
+    if #db.all > 2000 then table.remove(db.all, 1) end
+    if #db.all >= 3 then
+        local p = db.all[#db.all-2].."_"..db.all[#db.all-1].."_"..db.all[#db.all]
+        db.pat[p] = (db.pat[p] or 0) + 1
+    end
+    if hasFile then
+        pcall(function() WriteFile("DM_history.json", HS:JSONEncode(db)) end)
+    end
 end
 
--- CẤU HÌNH
-local TIEN_CUOC_GOC = 10000000
-local TIEN_CUOC_HIEN_TAI = TIEN_CUOC_GOC
-local CONFIDENCE_THRESHOLD = 70
-local MAX_WIN_TARGET = 150
-local THUA_LIEN_TIEP_MAX = 3
--- ============================================================================
--- GLOBAL DATABASE
--- ============================================================================
-local GlobalDatabase = {allResults = {}, patterns = {}}
-local DATA_FOLDER = "DeepMatrix_History/"
-local MASTER_FILE = DATA_FOLDER .. "all_results.json"
-
-local function addResultToDatabase(newResult)
-    if not newResult then return end
-    table.insert(GlobalDatabase.allResults, newResult)
-    if #GlobalDatabase.allResults > 2000 then table.remove(GlobalDatabase.allResults, 1) end
-    local len = #GlobalDatabase.allResults
-    if len >= 3 then
-        local pattern = GlobalDatabase.allResults[len-2] .. "_" .. GlobalDatabase.allResults[len-1] .. "_" .. GlobalDatabase.allResults[len]
-        GlobalDatabase.patterns[pattern] = (GlobalDatabase.patterns[pattern] or 0) + 1
-    end
-    if hasFileSupport then
-        pcall(function() WriteFile(MASTER_FILE, HttpService:JSONEncode(GlobalDatabase)) end)
-    end
-end
-
-local function findBestMatchByPattern(inputSequence)
-    if #inputSequence < 2 then return nil, 0 end
-    local totalOcc, gaAfter, gauAfter = 0, 0, 0
-    for i = 1, #GlobalDatabase.allResults - #inputSequence do
+local function matchPattern(seq)
+    if #seq < 2 then return nil, 0 end
+    local total, ga, gau = 0, 0, 0
+    for i = 1, #db.all - #seq do
         local match = true
-        for j = 1, #inputSequence do
-            if GlobalDatabase.allResults[i + j - 1] ~= inputSequence[j] then match = false; break end
+        for j = 1, #seq do
+            if db.all[i+j-1] ~= seq[j] then match = false break end
         end
         if match then
-            totalOcc = totalOcc + 1
-            local nextResult = GlobalDatabase.allResults[i + #inputSequence]
-            if nextResult == "Ga" then gaAfter = gaAfter + 1 elseif nextResult == "Gau" then gauAfter = gauAfter + 1 end
+            total = total + 1
+            local n = db.all[i + #seq]
+            if n == "Ga" then ga = ga + 1 elseif n == "Gau" then gau = gau + 1 end
         end
     end
-    if totalOcc >= 3 then
-        if gaAfter > gauAfter then return "Ga", math.floor((gaAfter / totalOcc) * 100)
-        else return "Gau", math.floor((gauAfter / totalOcc) * 100) end
+    if total >= 3 then
+        if ga > gau then return "Ga", math.floor(ga/total*100)
+        else return "Gau", math.floor(gau/total*100) end
     end
     return nil, 0
 end
--- ============================================================================
+
 -- MẠNG NƠ RON 5-8-2
--- ============================================================================
-local weightsIH, weightsHO = {}, {}
-local function sigmoid(x) return 1 / (1 + math.exp(-x)) end
+local wIH, wHO = {}, {}
+for i = 1, 5 do wIH[i] = {} for j = 1, 8 do wIH[i][j] = (math.random()-0.5)*2 end end
+for i = 1, 8 do wHO[i] = {} for j = 1, 2 do wHO[i][j] = (math.random()-0.5)*2 end end
 
-local function neuralPredict(inputs)
-    local hidden = {}
+local function sig(x) return 1/(1+math.exp(-x)) end
+
+local function neuralPredict(inp)
+    local h = {}
     for j = 1, 8 do
-        local sum = 0 for i = 1, 5 do sum = sum + inputs[i] * (weightsIH[i] and weightsIH[i][j] or 0) end
-        hidden[j] = sigmoid(sum)
+        local s = 0 for i = 1, 5 do s = s + inp[i] * (wIH[i] and wIH[i][j] or 0) end
+        h[j] = sig(s)
     end
-    local outputs = {0, 0}
+    local o = {0, 0}
     for j = 1, 2 do
-        local sum = 0 for i = 1, 8 do sum = sum + hidden[i] * (weightsHO[i] and weightsHO[i][j] or 0) end
-        outputs[j] = sigmoid(sum)
+        local s = 0 for i = 1, 8 do s = s + h[i] * (wHO[i] and wHO[i][j] or 0) end
+        o[j] = sig(s)
     end
-    return outputs
+    return o
 end
 
-local function initNeuralNet()
-    for i = 1, 5 do weightsIH[i] = {} for j = 1, 8 do weightsIH[i][j] = (math.random() - 0.5) * 2 end end
-    for i = 1, 8 do weightsHO[i] = {} for j = 1, 2 do weightsHO[i][j] = (math.random() - 0.5) * 2 end end
-end
-initNeuralNet()
+print("[2/6] Database và Neural Net đã sẵn sàng")
 -- ============================================================================
--- TẠO GUI - KÍCH THƯỚC NHỎ GỌN 320x480
+-- DEEP MATRIX v20.0 - PHẦN 3/6: TẠO GUI VÀ KÉO THẢ
 -- ============================================================================
 local gui = Instance.new("ScreenGui")
 gui.Name = "VipProMenu"
 gui.ResetOnSpawn = false
-gui.Parent = targetParent
+gui.Parent = parent
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 480)
-frame.Position = UDim2.new(0.5, -160, 0.5, -240)
+frame.Size = UDim2.new(0, 340, 0, 520)
+frame.Position = UDim2.new(0.5, -170, 0.5, -260)
 frame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
 frame.BorderSizePixel = 0
 frame.Parent = gui
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
-local topbar = Instance.new("Frame", frame)
-topbar.Size = UDim2.new(1, 0, 0, 36)
-topbar.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
-topbar.BorderSizePixel = 0
-Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 10)
-
-local title = Instance.new("TextLabel", topbar)
-title.Size = UDim2.new(1, -80, 1, 0)
-title.Position = UDim2.new(0, 12, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🧠 DEEP MATRIX v20"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 11
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextXAlignment = Enum.TextXAlignment.Left
-
-local mini = Instance.new("TextButton", topbar)
-mini.Size = UDim2.new(0, 24, 0, 24)
-mini.Position = UDim2.new(1, -56, 0, 6)
-mini.Text = "—"
-mini.Font = Enum.Font.GothamBold
-mini.TextSize = 12
-mini.BackgroundColor3 = Color3.fromRGB(25, 32, 45)
-mini.TextColor3 = Color3.fromRGB(160, 174, 192)
-Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 4)
-
-local close = Instance.new("TextButton", topbar)
-close.Size = UDim2.new(0, 24, 0, 24)
-close.Position = UDim2.new(1, -28, 0, 6)
-close.Text = "✕"
-close.Font = Enum.Font.GothamBold
-close.TextSize = 12
-close.BackgroundColor3 = Color3.fromRGB(50, 25, 30)
-close.TextColor3 = Color3.fromRGB(250, 130, 130)
-Instance.new("UICorner", close).CornerRadius = UDim.new(0, 4)
-close.MouseButton1Click:Connect(function() gui:Destroy() end)
-
--- KÉO THẢ (ĐÃ FIX)
-local dragging = false
+-- HỆ THỐNG KÉO THẢ (CHẠM GIỮ BẤT KỲ ĐÂU)
+local drag = false
 local dragStart, startPos
-topbar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag = true
         dragStart = input.Position
         startPos = frame.Position
     end
 end)
-topbar.InputEnded:Connect(function() dragging = false end)
+
+frame.InputEnded:Connect(function()
+    drag = false
+end)
+
 UIS.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
-local content = Instance.new("Frame", frame)
-content.Size = UDim2.new(1, -12, 1, -48)
-content.Position = UDim2.new(0, 6, 0, 42)
-content.BackgroundTransparency = 1
+print("[3/6] GUI đã tạo, có thể kéo thả")
 -- ============================================================================
--- DASHBOARD
+-- DEEP MATRIX v20.0 - PHẦN 4/6: TOPBAR VÀ DASHBOARD
 -- ============================================================================
-local ketqua = Instance.new("TextLabel", content)
-ketqua.Size = UDim2.new(1, 0, 0, 50)
+local top = Instance.new("Frame", frame)
+top.Size = UDim2.new(1, 0, 0, 42)
+top.Position = UDim2.new(0, 0, 0, 0)
+top.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
+Instance.new("UICorner", top).CornerRadius = UDim.new(0, 12)
+
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1, -80, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "🧠 DEEP MATRIX v20"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 13
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local mini = Instance.new("TextButton", top)
+mini.Size = UDim2.new(0, 28, 0, 28)
+mini.Position = UDim2.new(1, -60, 0, 7)
+mini.Text = "—"
+mini.Font = Enum.Font.GothamBold
+mini.TextSize = 14
+mini.BackgroundColor3 = Color3.fromRGB(25, 32, 45)
+mini.TextColor3 = Color3.fromRGB(160, 174, 192)
+Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
+
+local close = Instance.new("TextButton", top)
+close.Size = UDim2.new(0, 28, 0, 28)
+close.Position = UDim2.new(1, -28, 0, 7)
+close.Text = "✕"
+close.Font = Enum.Font.GothamBold
+close.TextSize = 14
+close.BackgroundColor3 = Color3.fromRGB(50, 25, 30)
+close.TextColor3 = Color3.fromRGB(250, 130, 130)
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+close.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+local cont = Instance.new("Frame", frame)
+cont.Size = UDim2.new(1, -16, 1, -54)
+cont.Position = UDim2.new(0, 8, 0, 46)
+cont.BackgroundTransparency = 1
+
+-- DỰ ĐOÁN
+local ketqua = Instance.new("TextLabel", cont)
+ketqua.Size = UDim2.new(1, 0, 0, 55)
 ketqua.Position = UDim2.new(0, 0, 0, 0)
 ketqua.BackgroundColor3 = Color3.fromRGB(16, 12, 24)
 ketqua.Text = "🔮 ĐANG ĐỒNG BỘ..."
 ketqua.Font = Enum.Font.GothamBlack
-ketqua.TextSize = 12
+ketqua.TextSize = 13
 ketqua.TextColor3 = Color3.fromRGB(220, 38, 38)
 ketqua.TextWrapped = true
 Instance.new("UICorner", ketqua).CornerRadius = UDim.new(0, 8)
 
--- Biểu đồ thanh
-local probFrame = Instance.new("Frame", content)
-probFrame.Size = UDim2.new(1, 0, 0, 30)
-probFrame.Position = UDim2.new(0, 0, 0, 54)
+-- BIỂU ĐỒ THANH
+local probFrame = Instance.new("Frame", cont)
+probFrame.Size = UDim2.new(1, 0, 0, 32)
+probFrame.Position = UDim2.new(0, 0, 0, 60)
 probFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 48)
 Instance.new("UICorner", probFrame).CornerRadius = UDim.new(0, 6)
 
@@ -202,145 +214,148 @@ Instance.new("UICorner", barGau).CornerRadius = UDim.new(0, 4)
 local barLabel = Instance.new("TextLabel", probFrame)
 barLabel.Size = UDim2.new(1, 0, 1, 0)
 barLabel.BackgroundTransparency = 1
-barLabel.Text = "🐥 GÀ 50%  |  🐻 GẤU 50%"
+barLabel.Text = "🐥 GÀ 50% | 🐻 GẤU 50%"
 barLabel.Font = Enum.Font.GothamBold
 barLabel.TextSize = 10
 barLabel.TextColor3 = Color3.new(1, 1, 1)
 
--- 6 hướng phân tích
-local analysisFrame = Instance.new("Frame", content)
-analysisFrame.Size = UDim2.new(1, 0, 0, 130)
-analysisFrame.Position = UDim2.new(0, 0, 0, 88)
-analysisFrame.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
-Instance.new("UICorner", analysisFrame).CornerRadius = UDim.new(0, 8)
+print("[4/6] Dashboard đã tạo xong")
+-- ============================================================================
+-- DEEP MATRIX v20.0 - PHẦN 5/6: PHÂN TÍCH 6 HƯỚNG VÀ THÔNG TIN
+-- ============================================================================
+local anaFrame = Instance.new("Frame", cont)
+anaFrame.Size = UDim2.new(1, 0, 0, 140)
+anaFrame.Position = UDim2.new(0, 0, 0, 97)
+anaFrame.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
+Instance.new("UICorner", anaFrame).CornerRadius = UDim.new(0, 8)
 
-local anaTexts = {}
-local anaTitles = {"🔴 Trend Bias", "🔵 Dòng vốn", "🟣 Pattern", "🟠 Chống bão", "🧠 Neural Net", "💾 Global DB"}
+local anaTxt = {}
+local anaTitle = {"🔴 Trend Bias", "🔵 Dòng vốn", "🟣 Pattern", "🟠 Chống bão", "🧠 Neural Net", "💾 Global DB"}
 for i = 1, 6 do
-    local txt = Instance.new("TextLabel", analysisFrame)
-    txt.Size = UDim2.new(1, -12, 0, 19)
-    txt.Position = UDim2.new(0, 6, 0, 4 + (i-1) * 21)
-    txt.BackgroundTransparency = 1
-    txt.Text = anaTitles[i] .. ": --"
-    txt.Font = Enum.Font.GothamSemibold
-    txt.TextSize = 9
-    txt.TextColor3 = Color3.fromRGB(190, 200, 230)
-    txt.TextXAlignment = Enum.TextXAlignment.Left
-    anaTexts[i] = txt
+    local t = Instance.new("TextLabel", anaFrame)
+    t.Size = UDim2.new(1, -12, 0, 20)
+    t.Position = UDim2.new(0, 6, 0, 4 + (i-1) * 22)
+    t.BackgroundTransparency = 1
+    t.Text = anaTitle[i] .. ": --"
+    t.Font = Enum.Font.GothamSemibold
+    t.TextSize = 9
+    t.TextColor3 = Color3.fromRGB(190, 200, 230)
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    anaTxt[i] = t
 end
 
--- Thống kê
-local countText = Instance.new("TextLabel", content)
-countText.Size = UDim2.new(1, 0, 0, 24)
-countText.Position = UDim2.new(0, 0, 0, 222)
+local countText = Instance.new("TextLabel", cont)
+countText.Size = UDim2.new(1, 0, 0, 26)
+countText.Position = UDim2.new(0, 0, 0, 242)
 countText.BackgroundColor3 = Color3.fromRGB(20, 18, 32)
-countText.Text = "🐥 Gà: 0  |  🐻 Gấu: 0"
+countText.Text = "🐥 Gà: 0 | 🐻 Gấu: 0"
 countText.Font = Enum.Font.GothamBold
 countText.TextSize = 10
 Instance.new("UICorner", countText).CornerRadius = UDim.new(0, 6)
 
-local lichsu = Instance.new("TextLabel", content)
-lichsu.Size = UDim2.new(1, 0, 0, 28)
-lichsu.Position = UDim2.new(0, 0, 0, 250)
-lichsu.BackgroundColor3 = Color3.fromRGB(12, 14, 20)
-lichsu.Text = "📜 Lịch sử: [---]"
-lichsu.Font = Enum.Font.Gotham
-lichsu.TextSize = 9
-lichsu.TextColor3 = Color3.fromRGB(150, 165, 185)
-Instance.new("UICorner", lichsu).CornerRadius = UDim.new(0, 6)
+local hisText = Instance.new("TextLabel", cont)
+hisText.Size = UDim2.new(1, 0, 0, 30)
+hisText.Position = UDim2.new(0, 0, 0, 272)
+hisText.BackgroundColor3 = Color3.fromRGB(12, 14, 20)
+hisText.Text = "📜 Lịch sử: [---]"
+hisText.Font = Enum.Font.Gotham
+hisText.TextSize = 9
+hisText.TextColor3 = Color3.fromRGB(150, 165, 185)
+Instance.new("UICorner", hisText).CornerRadius = UDim.new(0, 6)
 
-local timeLabel = Instance.new("TextLabel", content)
-timeLabel.Size = UDim2.new(1, 0, 0, 22)
-timeLabel.Position = UDim2.new(0, 0, 0, 282)
-timeLabel.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
-timeLabel.Text = "⏱️ XUNG NHỊP: --"
-timeLabel.Font = Enum.Font.GothamSemibold
-timeLabel.TextSize = 10
-Instance.new("UICorner", timeLabel).CornerRadius = UDim.new(0, 6)
+local timeText = Instance.new("TextLabel", cont)
+timeText.Size = UDim2.new(1, 0, 0, 24)
+timeText.Position = UDim2.new(0, 0, 0, 306)
+timeText.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+timeText.Text = "⏱️ XUNG NHỊP: --"
+timeText.Font = Enum.Font.GothamSemibold
+timeText.TextSize = 10
+Instance.new("UICorner", timeText).CornerRadius = UDim.new(0, 6)
 
-local betInfo = Instance.new("TextLabel", content)
-betInfo.Size = UDim2.new(1, 0, 0, 22)
-betInfo.Position = UDim2.new(0, 0, 0, 308)
-betInfo.BackgroundColor3 = Color3.fromRGB(14, 28, 22)
-betInfo.Text = "💰 Cược: 10M"
-betInfo.Font = Enum.Font.GothamSemibold
-betInfo.TextSize = 10
-betInfo.TextColor3 = Color3.fromRGB(74, 222, 128)
-Instance.new("UICorner", betInfo).CornerRadius = UDim.new(0, 6)
+local betText = Instance.new("TextLabel", cont)
+betText.Size = UDim2.new(1, 0, 0, 24)
+betText.Position = UDim2.new(0, 0, 0, 334)
+betText.BackgroundColor3 = Color3.fromRGB(14, 28, 22)
+betText.Text = "💰 Cược: 10M"
+betText.Font = Enum.Font.GothamSemibold
+betText.TextSize = 10
+betText.TextColor3 = Color3.fromRGB(74, 222, 128)
+Instance.new("UICorner", betText).CornerRadius = UDim.new(0, 6)
 
-local winCountLabel = Instance.new("TextLabel", content)
-winCountLabel.Size = UDim2.new(1, 0, 0, 22)
-winCountLabel.Position = UDim2.new(0, 0, 0, 334)
-winCountLabel.BackgroundColor3 = Color3.fromRGB(28, 16, 22)
-winCountLabel.Text = "🏆 Thắng: 0/150 | Thua lt: 0"
-winCountLabel.Font = Enum.Font.GothamBold
-winCountLabel.TextSize = 9
-winCountLabel.TextColor3 = Color3.fromRGB(250, 110, 110)
-Instance.new("UICorner", winCountLabel).CornerRadius = UDim.new(0, 6)
+local winText = Instance.new("TextLabel", cont)
+winText.Size = UDim2.new(1, 0, 0, 24)
+winText.Position = UDim2.new(0, 0, 0, 362)
+winText.BackgroundColor3 = Color3.fromRGB(28, 16, 22)
+winText.Text = "🏆 Thắng: 0/150 | Thua lt: 0"
+winText.Font = Enum.Font.GothamBold
+winText.TextSize = 9
+winText.TextColor3 = Color3.fromRGB(250, 110, 110)
+Instance.new("UICorner", winText).CornerRadius = UDim.new(0, 6)
 
-local moneyLabel = Instance.new("TextLabel", content)
-moneyLabel.Size = UDim2.new(1, 0, 0, 22)
-moneyLabel.Position = UDim2.new(0, 0, 0, 360)
-moneyLabel.BackgroundColor3 = Color3.fromRGB(20, 25, 38)
-moneyLabel.Text = "💰 Vốn: --"
-moneyLabel.Font = Enum.Font.GothamBold
-moneyLabel.TextSize = 10
-moneyLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-Instance.new("UICorner", moneyLabel).CornerRadius = UDim.new(0, 6)
+local moneyText = Instance.new("TextLabel", cont)
+moneyText.Size = UDim2.new(1, 0, 0, 24)
+moneyText.Position = UDim2.new(0, 0, 0, 390)
+moneyText.BackgroundColor3 = Color3.fromRGB(20, 25, 38)
+moneyText.Text = "💰 Vốn: --"
+moneyText.Font = Enum.Font.GothamBold
+moneyText.TextSize = 10
+moneyText.TextColor3 = Color3.fromRGB(255, 215, 0)
+Instance.new("UICorner", moneyText).CornerRadius = UDim.new(0, 6)
 
-local roleLabel = Instance.new("TextLabel", content)
-roleLabel.Size = UDim2.new(1, 0, 0, 22)
-roleLabel.Position = UDim2.new(0, 0, 0, 386)
-roleLabel.BackgroundColor3 = Color3.fromRGB(30, 20, 35)
-roleLabel.Text = "👤 Vai trò: --"
-roleLabel.Font = Enum.Font.Gotham
-roleLabel.TextSize = 9
-roleLabel.TextColor3 = Color3.fromRGB(180, 160, 220)
-Instance.new("UICorner", roleLabel).CornerRadius = UDim.new(0, 6)
+local roleText = Instance.new("TextLabel", cont)
+roleText.Size = UDim2.new(1, 0, 0, 24)
+roleText.Position = UDim2.new(0, 0, 0, 418)
+roleText.BackgroundColor3 = Color3.fromRGB(30, 20, 35)
+roleText.Text = "👤 Vai trò: --"
+roleText.Font = Enum.Font.Gotham
+roleText.TextSize = 9
+roleText.TextColor3 = Color3.fromRGB(180, 160, 220)
+Instance.new("UICorner", roleText).CornerRadius = UDim.new(0, 6)
 
-local autoBtn = Instance.new("TextButton", content)
-autoBtn.Size = UDim2.new(1, 0, 0, 38)
-autoBtn.Position = UDim2.new(0, 0, 0, 412)
+local autoBtn = Instance.new("TextButton", cont)
+autoBtn.Size = UDim2.new(1, 0, 0, 44)
+autoBtn.Position = UDim2.new(0, 0, 0, 446)
 autoBtn.BackgroundColor3 = Color3.fromRGB(185, 28, 28)
 autoBtn.Text = "▶ KÍCH HOẠT"
 autoBtn.Font = Enum.Font.GothamBlack
-autoBtn.TextSize = 11
+autoBtn.TextSize = 12
 Instance.new("UICorner", autoBtn).CornerRadius = UDim.new(0, 8)
+
+print("[5/6] Phân tích và thông tin đã tạo xong")
 -- ============================================================================
--- LOG CONSOLE (CUỘN ĐƯỢC)
+-- DEEP MATRIX v20.0 - PHẦN 6/6: ENGINE DỰ ĐOÁN VÀ LOG
 -- ============================================================================
-local logFrame = Instance.new("ScrollingFrame", content)
+local logFrame = Instance.new("ScrollingFrame", cont)
 logFrame.Size = UDim2.new(1, 0, 0, 0)
-logFrame.Position = UDim2.new(0, 0, 0, 454)
+logFrame.Position = UDim2.new(0, 0, 0, 494)
 logFrame.BackgroundColor3 = Color3.fromRGB(6, 8, 14)
 logFrame.BorderSizePixel = 0
 logFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 logFrame.ScrollBarThickness = 3
-Instance.new("UICorner", logFrame).CornerRadius = UDim.new(0, 6)
 logFrame.Visible = false
+Instance.new("UICorner", logFrame).CornerRadius = UDim.new(0, 6)
 
 local logLayout = Instance.new("UIListLayout", logFrame)
 logLayout.Padding = UDim.new(0, 1)
 
-local function AddLog(msg, color)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -8, 0, 16)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = " " .. os.date("%H:%M:%S") .. " " .. msg
-    lbl.Font = Enum.Font.Code
-    lbl.TextSize = 8
-    lbl.TextColor3 = color or Color3.fromRGB(180, 190, 210)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = logFrame
+local function addLog(msg, color)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -8, 0, 16)
+    l.BackgroundTransparency = 1
+    l.Text = " " .. os.date("%H:%M:%S") .. " " .. msg
+    l.Font = Enum.Font.Code
+    l.TextSize = 8
+    l.TextColor3 = color or Color3.fromRGB(180, 190, 210)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = logFrame
     logFrame.CanvasSize = UDim2.new(0, 0, 0, logLayout.AbsoluteContentSize.Y + 5)
     logFrame.CanvasPosition = Vector2.new(0, logLayout.AbsoluteContentSize.Y)
 end
 
--- Thu nhỏ/mở rộng log
-local showLogs = false
-local logBtn = Instance.new("TextButton", content)
-logBtn.Size = UDim2.new(0, 50, 0, 20)
-logBtn.Position = UDim2.new(1, -56, 0, 434)
+local showLog = false
+local logBtn = Instance.new("TextButton", cont)
+logBtn.Size = UDim2.new(0, 50, 0, 22)
+logBtn.Position = UDim2.new(1, -56, 0, 470)
 logBtn.Text = "📜"
 logBtn.Font = Enum.Font.GothamBold
 logBtn.TextSize = 10
@@ -348,257 +363,291 @@ logBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 50)
 logBtn.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", logBtn).CornerRadius = UDim.new(0, 4)
 logBtn.MouseButton1Click:Connect(function()
-    showLogs = not showLogs
-    logFrame.Visible = showLogs
-    logFrame.Size = UDim2.new(1, 0, 0, showLogs and 80 or 0)
-    autoBtn.Position = UDim2.new(0, 0, 0, showLogs and 496 or 412)
-    logBtn.Position = UDim2.new(1, -56, 0, showLogs and 518 or 434)
+    showLog = not showLog
+    logFrame.Visible = showLog
+    logFrame.Size = UDim2.new(1, 0, 0, showLog and 80 or 0)
+    autoBtn.Position = UDim2.new(0, 0, 0, showLog and 530 or 446)
+    logBtn.Position = UDim2.new(1, -56, 0, showLog and 554 or 470)
 end)
 
-AddLog("[SYS] Deep Matrix v20 khởi động", Color3.fromRGB(34, 197, 94))
--- ============================================================================
--- ENGINE XỬ LÝ REMOTE VÀ DỰ ĐOÁN
--- ============================================================================
-local historyMemory = {}
-local tongTienGa, tongTienGau = 0, 0
-local isAutoEnabled = false
-local betPlacedInThisRound = false
-local lastBotPrediction = ""
-local totalWins = 0
-local totalLosesInRow = 0
-local isFrozenRound = false
+addLog("[SYS] Deep Matrix v20 khởi động", Color3.fromRGB(34, 197, 94))
 
-local function updateHistoryUI()
-    local ga, gau = 0, 0
-    local emojiHistory = {}
-    local startIdx = math.max(1, #historyMemory - 9)
-    for i = startIdx, #historyMemory do
-        if historyMemory[i] == "Ga" then ga = ga + 1; table.insert(emojiHistory, "🐥")
-        else gau = gau + 1; table.insert(emojiHistory, "🐻") end
+-- CẬP NHẬT UI
+local function updateUI()
+    local ga, gau, emo = 0, 0, {}
+    for i = math.max(1, #history - 9), #history do
+        if history[i] == "Ga" then
+            ga = ga + 1
+            emo[#emo + 1] = "🐥"
+        else
+            gau = gau + 1
+            emo[#emo + 1] = "🐻"
+        end
     end
-    countText.Text = string.format("🐥 Gà: %d  |  🐻 Gấu: %d", ga, gau)
-    lichsu.Text = #emojiHistory > 0 and "📜 Lịch sử: " .. table.concat(emojiHistory, " ") or "📜 Lịch sử: [---]"
+    countText.Text = "🐥 Gà: " .. ga .. " | 🐻 Gấu: " .. gau
+    hisText.Text = #emo > 0 and "📜 Lịch sử: " .. table.concat(emo, " ") or "📜 Lịch sử: [---]"
 end
 
-local function executeDeepAnalysis()
-    local size = #historyMemory
-    for i = 1, 6 do anaTexts[i].Text = anaTitles[i] .. ": --" end
-    if size < 2 then return "Ga", 50 end
-    
-    local scoreGa, scoreGau = 0, 0
-    
+-- HÀM DỰ ĐOÁN CHÍNH
+local function deepAnalysis()
+    for i = 1, 6 do anaTxt[i].Text = anaTitle[i] .. ": --" end
+    if #history < 2 then return "Ga", 50 end
+
+    local sGa, sGau = 0, 0
+
     -- H1: Trend Bias
     local cGa, cGau = 0, 0
-    for i = math.max(1, size - 13), size do
-        if historyMemory[i] == "Ga" then cGa = cGa + 1 else cGau = cGau + 1 end
+    for i = math.max(1, #history - 13), #history do
+        if history[i] == "Ga" then cGa = cGa + 1 else cGau = cGau + 1 end
     end
-    if cGa > cGau then scoreGa = scoreGa + 1.5; anaTexts[1].Text = anaTitles[1] .. ": GÀ (" .. cGa .. "/" .. (cGa+cGau) .. ")"
-    elseif cGau > cGa then scoreGau = scoreGau + 1.5; anaTexts[1].Text = anaTitles[1] .. ": GẤU (" .. cGau .. "/" .. (cGa+cGau) .. ")"
-    else anaTexts[1].Text = anaTitles[1] .. ": Cân bằng" end
-    
+    if cGa > cGau then
+        sGa = sGa + 1.5
+        anaTxt[1].Text = anaTitle[1] .. ": GÀ (" .. cGa .. "/" .. (cGa + cGau) .. ")"
+    elseif cGau > cGa then
+        sGau = sGau + 1.5
+        anaTxt[1].Text = anaTitle[1] .. ": GẤU (" .. cGau .. "/" .. (cGa + cGau) .. ")"
+    else
+        anaTxt[1].Text = anaTitle[1] .. ": Cân bằng"
+    end
+
     -- H2: Dòng vốn
-    if tongTienGa > 0 and tongTienGau > 0 then
-        local total = tongTienGa + tongTienGau
-        local pGa = (tongTienGa / total) * 100
-        local pGau = (tongTienGau / total) * 100
-        anaTexts[2].Text = string.format(anaTitles[2] .. ": Gà %.0f%% | Gấu %.0f%%", pGa, pGau)
-        if pGa >= 68 then scoreGa = scoreGa + 2.0
-        elseif pGau >= 68 then scoreGau = scoreGau + 2.0 end
+    if tGa > 0 and tGau > 0 then
+        local total = tGa + tGau
+        local pGa = (tGa / total) * 100
+        anaTxt[2].Text = string.format(anaTitle[2] .. ": Gà %.0f%% | Gấu %.0f%%", pGa, 100 - pGa)
+        if pGa >= 68 then
+            sGa = sGa + 2.0
+        elseif pGa <= 32 then
+            sGau = sGau + 2.0
+        end
     end
-    
-    -- H3: Pattern
-    if size >= 4 then
-        local l1,l2,l3,l4 = historyMemory[size], historyMemory[size-1], historyMemory[size-2], historyMemory[size-3]
+
+    -- H3: Pattern đối xứng
+    if #history >= 4 then
+        local l1, l2, l3, l4 = history[#history], history[#history-1], history[#history-2], history[#history-3]
         if l1 == l3 and l2 == l4 and l1 ~= l2 then
-            if l1 == "Ga" then scoreGau = scoreGau + 1.8 else scoreGa = scoreGa + 1.8 end
-            anaTexts[3].Text = anaTitles[3] .. ": Đối xứng 1-1"
-        else anaTexts[3].Text = anaTitles[3] .. ": Chuỗi tự do" end
+            if l1 == "Ga" then sGau = sGau + 1.8 else sGa = sGa + 1.8 end
+            anaTxt[3].Text = anaTitle[3] .. ": Đối xứng 1-1"
+        else
+            anaTxt[3].Text = anaTitle[3] .. ": Chuỗi tự do"
+        end
     end
-    
+
     -- H4: Chống bão
-    local streak = 1
-    local current = historyMemory[size]
-    for i = size-1, 1, -1 do
-        if historyMemory[i] == current then streak = streak + 1 else break end
+    local streak, cur = 1, history[#history]
+    for i = #history - 1, 1, -1 do
+        if history[i] == cur then streak = streak + 1 else break end
     end
     if streak >= 4 then
-        if current == "Ga" then scoreGau = scoreGau + 2.5 else scoreGa = scoreGa + 2.5 end
-        anaTexts[4].Text = string.format(anaTitles[4] .. ": Bẻ bão %s (dài %d)", current == "Ga" and "GÀ" or "GẤU", streak)
-    else anaTexts[4].Text = anaTitles[4] .. ": An toàn" end
-    
+        if cur == "Ga" then sGau = sGau + 2.5 else sGa = sGa + 2.5 end
+        anaTxt[4].Text = string.format(anaTitle[4] .. ": Bẻ bão %s (dài %d)", cur == "Ga" and "GÀ" or "GẤU", streak)
+    else
+        anaTxt[4].Text = anaTitle[4] .. ": An toàn"
+    end
+
     -- H5: Neural Net
-    if #historyMemory >= 5 then
-        local inputs = {}
-        for i = size-4, size do inputs[#inputs+1] = (historyMemory[i] == "Ga") and 1 or 0 end
-        local outputs = neuralPredict(inputs)
-        if outputs[1] > outputs[2] + 0.15 then
-            scoreGa = scoreGa + 2.2
-            anaTexts[5].Text = string.format(anaTitles[5] .. ": GÀ (%.0f%%)", outputs[1]*100)
-        elseif outputs[2] > outputs[1] + 0.15 then
-            scoreGau = scoreGau + 2.2
-            anaTexts[5].Text = string.format(anaTitles[5] .. ": GẤU (%.0f%%)", outputs[2]*100)
-        else anaTexts[5].Text = anaTitles[5] .. ": Chờ thêm" end
+    if #history >= 5 then
+        local inp = {}
+        for i = #history - 4, #history do inp[#inp + 1] = (history[i] == "Ga") and 1 or 0 end
+        local out = neuralPredict(inp)
+        if out[1] > out[2] + 0.15 then
+            sGa = sGa + 2.2
+            anaTxt[5].Text = string.format(anaTitle[5] .. ": GÀ (%.0f%%)", out[1] * 100)
+        elseif out[2] > out[1] + 0.15 then
+            sGau = sGau + 2.2
+            anaTxt[5].Text = string.format(anaTitle[5] .. ": GẤU (%.0f%%)", out[2] * 100)
+        else
+            anaTxt[5].Text = anaTitle[5] .. ": Chờ thêm"
+        end
     end
-    
+
     -- H6: Global DB
-    if #historyMemory >= 3 then
+    if #history >= 3 then
         local lastFew = {}
-        for i = math.max(1, size-3), size do lastFew[#lastFew+1] = historyMemory[i] end
-        local matched, conf = findBestMatchByPattern(lastFew)
-        if matched then
-            if matched == "Ga" then scoreGa = scoreGa + 2.8 * (conf/100); anaTexts[6].Text = string.format(anaTitles[6] .. ": GÀ (%.0f%%)", conf)
-            else scoreGau = scoreGau + 2.8 * (conf/100); anaTexts[6].Text = string.format(anaTitles[6] .. ": GẤU (%.0f%%)", conf) end
-        else anaTexts[6].Text = anaTitles[6] .. ": Đủ 3 lần" end
+        for i = math.max(1, #history - 3), #history do lastFew[#lastFew + 1] = history[i] end
+        local m, c = matchPattern(lastFew)
+        if m then
+            if m == "Ga" then
+                sGa = sGa + 2.8 * (c / 100)
+                anaTxt[6].Text = string.format(anaTitle[6] .. ": GÀ (%.0f%%)", c)
+            else
+                sGau = sGau + 2.8 * (c / 100)
+                anaTxt[6].Text = string.format(anaTitle[6] .. ": GẤU (%.0f%%)", c)
+            end
+        else
+            anaTxt[6].Text = anaTitle[6] .. ": Đủ 3 lần"
+        end
     end
-    
-    local totalScore = scoreGa + scoreGau
-    if totalScore == 0 then return "Ga", 50 end
-    local probGa = (scoreGa / totalScore) * 100
-    local probGau = (scoreGau / totalScore) * 100
-    barGa.Size = UDim2.new(probGa/100, 0, 1, 0)
-    barGau.Size = UDim2.new(probGau/100, 0, 1, 0)
-    barGau.Position = UDim2.new(probGa/100, 0, 0, 0)
-    barLabel.Text = string.format("🐥 GÀ %.0f%%  |  🐻 GẤU %.0f%%", probGa, probGau)
-    
-    if scoreGa > scoreGau then return "Ga", 50 + math.floor((scoreGa/totalScore)*45)
-    else return "Gau", 50 + math.floor((scoreGau/totalScore)*45) end
+
+    local total = sGa + sGau
+    if total == 0 then return "Ga", 50 end
+
+    local pGa = (sGa / total) * 100
+    barGa.Size = UDim2.new(pGa / 100, 0, 1, 0)
+    barGau.Size = UDim2.new((100 - pGa) / 100, 0, 1, 0)
+    barGau.Position = UDim2.new(pGa / 100, 0, 0, 0)
+    barLabel.Text = string.format("🐥 GÀ %.0f%% | 🐻 GẤU %.0f%%", pGa, 100 - pGa)
+
+    if sGa > sGau then
+        return "Ga", 50 + math.floor((sGa / total) * 45)
+    else
+        return "Gau", 50 + math.floor((sGau / total) * 45)
+    end
 end
 
-local function ExecuteAutoBet(side, amount)
-    if not isAutoEnabled then return end
+-- HÀM ĐẶT CƯỢC
+local function execBet(side, amt)
+    if not auto then return end
     task.spawn(function()
         pcall(function()
             local gg = player.PlayerGui:FindFirstChild("GaGauGui")
             if gg and gg:FindFirstChild("FrameGaGau") then
                 local fg = gg.FrameGaGau
-                local xacnhan = fg:FindFirstChild("XacNhan")
+                local xn = fg:FindFirstChild("XacNhan")
                 if side == "Ga" and fg:FindFirstChild("ChonGa") and fg:FindFirstChild("DienSoTienGa") then
                     fg.ChonGa:Activate()
-                    fg.DienSoTienGa.Text = tostring(amount)
+                    fg.DienSoTienGa.Text = tostring(amt)
                     fg.DienSoTienGa:ReleaseFocus(true)
-                    xacnhan:Activate()
-                    AddLog("[ORDER] Lệnh GÀ " .. amount/1000000 .. "M", Color3.fromRGB(34, 197, 94))
+                    xn:Activate()
+                    addLog("[ORDER] Lệnh GÀ " .. amt / 1e6 .. "M", Color3.fromRGB(34, 197, 94))
                 elseif side == "Gau" and fg:FindFirstChild("ChonGau") and fg:FindFirstChild("DienSoTienGau") then
                     fg.ChonGau:Activate()
-                    fg.DienSoTienGau.Text = tostring(amount)
+                    fg.DienSoTienGau.Text = tostring(amt)
                     fg.DienSoTienGau:ReleaseFocus(true)
-                    xacnhan:Activate()
-                    AddLog("[ORDER] Lệnh GẤU " .. amount/1000000 .. "M", Color3.fromRGB(168, 85, 247))
+                    xn:Activate()
+                    addLog("[ORDER] Lệnh GẤU " .. amt / 1e6 .. "M", Color3.fromRGB(168, 85, 247))
                 end
             end
         end)
     end)
 end
--- ============================================================================
+
 -- KẾT NỐI REMOTE
--- ============================================================================
 task.spawn(function()
-    local remote = ReplicatedStorage:FindFirstChild("Remote")
-    if not remote then AddLog("[ERR] Không tìm thấy Remote", Color3.fromRGB(220, 38, 38)) return end
-    local update = remote:FindFirstChild("GaGauUpdate")
-    if not update then AddLog("[ERR] Không tìm thấy GaGauUpdate", Color3.fromRGB(220, 38, 38)) return end
-    
-    update.OnClientEvent:Connect(function(act, ...)
-        local args = {...}
+    local remote = RS:FindFirstChild("Remote")
+    if not remote then
+        addLog("[ERR] Không tìm thấy Remote", Color3.fromRGB(220, 38, 38))
+        return
+    end
+    local upd = remote:FindFirstChild("GaGauUpdate")
+    if not upd then
+        addLog("[ERR] Không tìm thấy GaGauUpdate", Color3.fromRGB(220, 38, 38))
+        return
+    end
+
+    upd.OnClientEvent:Connect(function(act, ...)
+        local args = { ... }
         if act == "UpdateTotals" then
-            tongTienGa = args[1] or 0
-            tongTienGau = args[2] or 0
-            moneyLabel.Text = "💰 Vốn: " .. string.format("%.0f", tongTienGa + tongTienGau) .. " VND"
-            
+            tGa = args[1] or 0
+            tGau = args[2] or 0
+            moneyText.Text = "💰 Vốn: " .. string.format("%.0f", tGa + tGau) .. " VND"
         elseif act == "Countdown" then
             local sec = args[1]
-            timeLabel.Text = "⏱️ XUNG NHỊP: " .. sec .. "s"
-            if sec == 15 and isAutoEnabled and not betPlacedInThisRound then
-                local side, conf = executeDeepAnalysis()
-                if conf >= CONFIDENCE_THRESHOLD then
-                    lastBotPrediction = side
+            timeText.Text = "⏱️ XUNG NHỊP: " .. sec .. "s"
+            if sec == 15 and auto and not betPlaced then
+                local side, conf = deepAnalysis()
+                if conf >= confThres then
+                    lastPred = side
+                    betPlaced = true
                     ketqua.Text = string.format("🔮 DỰ ĐOÁN: %s\n📊 ĐỘ TIN CẬY: %d%%", side == "Ga" and "🐥 GÀ" or "🐻 GẤU", conf)
-                    ExecuteAutoBet(side, TIEN_CUOC_HIEN_TAI)
-                    betPlacedInThisRound = true
+                    execBet(side, betCur)
                 else
-                    ketqua.Text = string.format("🔮 BỎ QUA (%.0f%% < %d%%)", conf, CONFIDENCE_THRESHOLD)
+                    ketqua.Text = string.format("🔮 BỎ QUA (%.0f%% < %d%%)", conf, confThres)
                 end
             end
-            
         elseif act == "Result" then
             local winner = args[1]
             if not winner then return end
             local clean = (string.lower(winner) == "gau") and "Gau" or "Ga"
-            
-            if lastBotPrediction ~= "" and betPlacedInThisRound then
-                if lastBotPrediction == clean then
-                    totalWins = totalWins + 1
-                    totalLosesInRow = 0
-                    TIEN_CUOC_HIEN_TAI = TIEN_CUOC_GOC
-                    AddLog("[WIN] +1 | Tổng thắng: " .. totalWins, Color3.fromRGB(34, 197, 94))
+
+            if lastPred ~= "" and betPlaced then
+                if lastPred == clean then
+                    wins = wins + 1
+                    loses = 0
+                    betCur = betBase
+                    addLog("[WIN] +1 | Tổng thắng: " .. wins, Color3.fromRGB(34, 197, 94))
                 else
-                    totalLosesInRow = totalLosesInRow + 1
-                    if totalLosesInRow >= THUA_LIEN_TIEP_MAX then
-                        isFrozenRound = true
-                        TIEN_CUOC_HIEN_TAI = TIEN_CUOC_GOC
-                        AddLog("[LOSE] Thua " .. totalLosesInRow .. " lần liên tiếp! Khóa phiên", Color3.fromRGB(220, 38, 38))
+                    loses = loses + 1
+                    if loses >= loseMax then
+                        frozen = true
+                        betCur = betBase
+                        addLog("[LOSE] Thua " .. loses .. " lần! Khóa phiên", Color3.fromRGB(220, 38, 38))
                     else
-                        TIEN_CUOC_HIEN_TAI = TIEN_CUOC_HIEN_TAI * 2
-                        AddLog("[LOSE] Tăng cược lên " .. TIEN_CUOC_HIEN_TAI/1000000 .. "M", Color3.fromRGB(245, 158, 11))
+                        betCur = betCur * 2
+                        addLog("[LOSE] Tăng cược lên " .. betCur / 1e6 .. "M", Color3.fromRGB(245, 158, 11))
                     end
                 end
-                winCountLabel.Text = string.format("🏆 Thắng: %d/150 | Thua lt: %d", totalWins, totalLosesInRow)
-                betInfo.Text = "💰 Cược: " .. TIEN_CUOC_HIEN_TAI/1000000 .. "M"
+                winText.Text = string.format("🏆 Thắng: %d/%d | Thua lt: %d", wins, winTarget, loses)
+                betText.Text = "💰 Cược: " .. betCur / 1e6 .. "M"
             end
-            
-            table.insert(historyMemory, clean)
-            if #historyMemory > 30 then table.remove(historyMemory, 1) end
-            updateHistoryUI()
-            addResultToDatabase(clean)
-            
-            tongTienGa, tongTienGau = 0, 0
-            lastBotPrediction = ""
-            betPlacedInThisRound = false
+
+            table.insert(history, clean)
+            if #history > 30 then table.remove(history, 1) end
+            updateUI()
+            addResult(clean)
+
+            tGa, tGau = 0, 0
+            lastPred = ""
+            betPlaced = false
             ketqua.Text = "🔮 SẴN SÀNG PHIÊN TIẾP"
-            
-            if totalWins >= MAX_WIN_TARGET then
-                autoBtn.Text = "🏆 HOÀN THÀNH MỤC TIÊU"
+
+            if wins >= winTarget then
+                autoBtn.Text = "🏆 HOÀN THÀNH"
                 autoBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
-                isAutoEnabled = false
+                auto = false
             end
-            
         elseif act == "SyncState" then
             local data = args[1] or {}
             if data.history then
                 for _, v in ipairs(data.history) do
-                    table.insert(historyMemory, (string.lower(tostring(v)) == "gau") and "Gau" or "Ga")
+                    table.insert(history, (string.lower(tostring(v)) == "gau") and "Gau" or "Ga")
                 end
-                while #historyMemory > 30 do table.remove(historyMemory, 1) end
-                updateHistoryUI()
-                AddLog("[SYNC] Đã đồng bộ " .. #historyMemory .. " kết quả", Color3.fromRGB(96, 165, 250))
+                while #history > 30 do table.remove(history, 1) end
+                updateUI()
+                addLog("[SYNC] Đồng bộ " .. #history .. " kết quả", Color3.fromRGB(96, 165, 250))
             end
         end
     end)
-    
-    update:FireServer("RequestSync")
-    AddLog("[ENGINE] Đã kết nối remote", Color3.fromRGB(34, 197, 94))
+
+    upd:FireServer("RequestSync")
+    addLog("[ENGINE] Đã kết nối remote", Color3.fromRGB(34, 197, 94))
 end)
 
+-- NÚT KÍCH HOẠT
 autoBtn.MouseButton1Click:Connect(function()
-    if totalWins >= MAX_WIN_TARGET then return end
-    isAutoEnabled = not isAutoEnabled
-    if isAutoEnabled then
+    if wins >= winTarget then return end
+    auto = not auto
+    if auto then
         autoBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
         autoBtn.Text = "⏸ ĐANG CHẠY"
-        AddLog("[ENGINE] Hệ thống đã KÍCH HOẠT", Color3.fromRGB(34, 197, 94))
+        addLog("[ENGINE] Hệ thống KÍCH HOẠT", Color3.fromRGB(34, 197, 94))
     else
         autoBtn.BackgroundColor3 = Color3.fromRGB(185, 28, 28)
         autoBtn.Text = "▶ KÍCH HOẠT"
-        AddLog("[ENGINE] Hệ thống TẠM DỪNG", Color3.fromRGB(220, 38, 38))
+        addLog("[ENGINE] Hệ thống TẠM DỪNG", Color3.fromRGB(220, 38, 38))
     end
 end)
 
+-- THU NHỎ
 local minimized = false
 mini.MouseButton1Click:Connect(function()
     minimized = not minimized
-    content.Visible = not minimized
-    frame.Size = minimized and UDim2.new(0, 320, 0, 36) or UDim2.new(0, 320, 0, 480)
+    cont.Visible = not minimized
+    frame.Size = minimized and UDim2.new(0, 340, 0, 42) or UDim2.new(0, 340, 0, 520)
     mini.Text = minimized and "＋" or "—"
 end)
 
-AddLog("[READY] Deep Matrix v20 sẵn sàng!", Color3.fromRGB(34, 197, 94))
+-- TẢI DATABASE
+if hasFile and isfile("DM_history.json") then
+    pcall(function()
+        local d = HS:JSONDecode(readfile("DM_history.json"))
+        if d then
+            db.all = d.all or {}
+            db.pat = d.pat or {}
+            addLog("[DB] Đã tải " .. #db.all .. " kết quả lịch sử", Color3.fromRGB(96, 165, 250))
+        end
+    end)
+end
+
+addLog("[READY] Deep Matrix v20 sẵn sàng! CHẠM GIỮ BẤT KỲ ĐÂU để kéo menu", Color3.fromRGB(34, 197, 94))
+print("[6/6] Hoàn tất! Menu đã sẵn sàng")
