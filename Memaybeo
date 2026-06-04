@@ -621,7 +621,7 @@ autoBtn.MouseButton1Click:Connect(function()
         frozen = false; betPlaced = false
     else
         autoBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
-        autoBtn.Text = "▶ KÍCH HOẠT MATRIX V38.0"
+        autoBtn.Text = "▶ KÍCH HOẠT MEMAYBEO V38.0"
     end
 end)
 
