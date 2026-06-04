@@ -1,4 +1,4 @@
-here-- ============================================================================
+-- ============================================================================
 -- DEEP MATRIX v38.0 - INTERFACE TRONG SUỐT CYBERPUNK + TRỢ LÝ EM GUỘC AI
 -- ============================================================================
 local Players = game:GetService("Players")
@@ -97,7 +97,7 @@ end
 -- GIAO DIỆN TRONG SUỐT CYBERPUNK (GLASSMORPHISM)
 -- ============================================================================
 local gui = Instance.new("ScreenGui")
-gui.Name = "MEMAYBEO HUB PRO"
+gui.Name = "MatrixCyberpunkV38"
 gui.ResetOnSpawn = false
 gui.Parent = parent
 
@@ -142,7 +142,7 @@ local title = Instance.new("TextLabel", top)
 title.Size = UDim2.new(1, -80, 1, 0)
 title.Position = UDim2.new(0, 14, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "⚡ MATRIX v38.0 - CYBERPUNK GLASS"
+title.Text = "MEMAYBEO PRO v38.0"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 11
 title.TextColor3 = Color3.fromRGB(0, 210, 255)
@@ -617,7 +617,7 @@ autoBtn.MouseButton1Click:Connect(function()
     auto = not auto
     if auto then
         autoBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
-        autoBtn.Text = "⏸ ĐANG CHẠY MATRIX V38.0"
+        autoBtn.Text = "⏸ ĐANG CHẠY MEMAYBEO V38.0"
         frozen = false; betPlaced = false
     else
         autoBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
