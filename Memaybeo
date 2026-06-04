@@ -97,7 +97,7 @@ end
 -- GIAO DIỆN TRONG SUỐT CYBERPUNK (GLASSMORPHISM)
 -- ============================================================================
 local gui = Instance.new("ScreenGui")
-gui.Name = "MatrixCyberpunkV38"
+gui.Name = "MEMAYBEO HUB PRO"
 gui.ResetOnSpawn = false
 gui.Parent = parent
 
