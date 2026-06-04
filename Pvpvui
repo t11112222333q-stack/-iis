@@ -1,0 +1,212 @@
+-- MEMAYBEO HUB v26.0 - FULL PVP ULTIMATE MENU
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local guiName = "MeMayBeo_PvP_V26_Full"
+
+-- KHỞI TẠO CÁC BIẾN CẤU HÌNH GỐC
+_G.AutoClickPvP = false
+_G.HitboxPvP = false
+_G.SpeedPvP = false
+_G.HealthESP = false
+_G.AutoHeal = false
+
+local HITBOX_SIZE = Vector3.new(15, 15, 15)
+local TOC_DO_PVP = 32
+local NGUONG_MAU_YEU = 99 -- Mất 1 chút máu (dưới 99%) là tự động dùng băng gạc
+
+-- HÀM TẠO GIAO DIỆN FULL MENU
+local function CreateFullMenu()
+    if playerGui:FindFirstChild(guiName) then return end
+    
+    local sg = Instance.new("ScreenGui", playerGui)
+    sg.Name = guiName
+    sg.ResetOnSpawn = false
+    
+    -- Khung Menu Chính
+    local f = Instance.new("Frame", sg)
+    f.Size = UDim2.new(0, 260, 0, 310)
+    f.Position = UDim2.new(0.05, 0, 0.25, 0)
+    f.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    f.BorderSizePixel = 0
+    f.Active = true; f.Draggable = true
+    
+    -- Bo góc menu
+    local corner = Instance.new("UICorner", f)
+    corner.CornerRadius = UDim.new(0, 8)
+    
+    -- Tiêu đề Menu
+    local title = Instance.new("TextLabel", f)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Text = "⚔️ MMB HUB - FULL PVP V26"
+    title.BackgroundColor3 = Color3.fromRGB(225, 29, 72) -- Màu đỏ hồng neon nổi bật
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 16
+    
+    local titleCorner = Instance.new("UICorner", title)
+    titleCorner.CornerRadius = UDim.new(0, 8)
+
+    -- Hàm tạo nút bấm tự động căn chỉnh khoảng cách
+    local function AddToggle(text, yPos, globalVar)
+        local btn = Instance.new("TextButton", f)
+        btn.Size = UDim2.new(0, 220, 0, 38)
+        btn.Position = UDim2.new(0, 20, 0, yPos)
+        btn.Text = text .. " [TẮT]"
+        btn.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
+        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        btn.Font = Enum.Font.SourceSansBold
+        btn.TextSize = 14
+        btn.BorderSizePixel = 0
+        
+        local btnCorner = Instance.new("UICorner", btn)
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        
+        -- Sự kiện Click Bật/Tắt
+        btn.MouseButton1Click:Connect(function()
+            _G[globalVar] = not _G[globalVar]
+            if _G[globalVar] then
+                btn.Text = text .. " [BẬT]"
+                btn.BackgroundColor3 = Color3.fromRGB(16, 185, 129) -- Màu xanh lá
+                btn.TextColor3 = Color3.new(1, 1, 1)
+            else
+                btn.Text = text .. " [TẮT]"
+                btn.BackgroundColor3 = Color3.fromRGB(38, 38, 48) -- Màu xám tối
+                btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end)
+    end
+
+    -- Khởi tạo danh sách 5 tính năng chính vào menu
+    AddToggle("Tự Động Đánh (Cầm Tool)", 55, "AutoClickPvP")
+    AddToggle("Mở Rộng Hitbox (Hộp Đỏ)", 105, "HitboxPvP")
+    AddToggle("X2 Tốc Độ Di Chuyển", 155, "SpeedPvP")
+    AddToggle("Hiện Máu Đối Thủ (ESP)", 205, "HealthESP")
+    AddToggle("Auto Dùng Băng Gạc (99%)", 255, "AutoHeal")
+end
+
+-- Đảm bảo menu luôn xuất hiện lại nếu nhân vật hồi sinh
+RunService.Heartbeat:Connect(function()
+    if not playerGui:FindFirstChild(guiName) then CreateFullMenu() end
+end)
+
+-- [MỤC 1] LUỒNG TỰ ĐỘNG CLICK VŨ KHÍ SIÊU TỐC
+task.spawn(function()
+    while true do
+        task.wait(0.01)
+        if _G.AutoClickPvP then
+            local char = player.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            if tool then tool:Activate() end
+        end
+    end
+end)
+
+-- [MỤC 2] LUỒNG KIỂM TRA MÁU VÀ AUTO SỬ DỤNG BĂNG GẠC (MAX TỐC ĐỘ)
+task.spawn(function()
+    while true do
+        task.wait(0.01) -- Quét liên tục mỗi 10 mili-giây để phát hiện tụt máu ngay lập tức
+        if _G.AutoHeal then
+            local char = player.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if humanoid and humanoid.Health > 0 then
+                local phanTramMau = (humanoid.Health / humanoid.MaxHealth) * 100
+                
+                -- Chỉ cần hụt một chút máu (dưới 99%) là nhấn nút dùng băng gạc ngay
+                if phanTramMau <= NGUONG_MAU_YEU then
+                    local inventory = playerGui:FindFirstChild("Inventory")
+                    local switchBangGac = inventory and inventory:FindFirstChild("SwitchBangGac")
+                    
+                    if switchBangGac and switchBangGac:IsA("GuiButton") then
+                        -- Thực thi click siêu tốc vượt UI
+                        for _, connection in pairs(getconnections(switchBangGac.MouseButton1Click)) do
+                            connection:Fire()
+                        end
+                        for _, connection in pairs(getconnections(switchBangGac.Activated)) do
+                            connection:Fire()
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- [MỤC 3] HÀM VẼ THANH MÁU XUYÊN TƯỜNG (ESP HEALTH)
+local function UpdateESP(targetPlayer)
+    local char = targetPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
+    local rootPart = char.HumanoidRootPart
+    local humanoid = char.Humanoid
+    local espGui = rootPart:FindFirstChild("MMB_HealthESP")
+    
+    if _G.HealthESP and humanoid.Health > 0 then
+        if not espGui then
+            espGui = Instance.new("BillboardGui", rootPart)
+            espGui.Name = "MMB_HealthESP"
+            espGui.AlwaysOnTop = true
+            espGui.Size = UDim2.new(0, 200, 0, 50)
+            espGui.StudsOffset = Vector3.new(0, 3, 0)
+            
+            local textLabel = Instance.new("TextLabel", espGui)
+            textLabel.Name = "HealthText"
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextSize = 13
+            textLabel.Font = Enum.Font.SourceSansBold
+        end
+        
+        local healthLabel = espGui:FindFirstChild("HealthText")
+        if healthLabel then
+            local currentHealth = math.floor(humanoid.Health)
+            local maxHealth = math.floor(humanoid.MaxHealth)
+            healthLabel.Text = string.format("%s\n❤️ Máu: %d / %d", targetPlayer.Name, currentHealth, maxHealth)
+            
+            -- Đổi màu chữ động theo trạng thái yếu máu
+            healthLabel.TextColor3 = (currentHealth / maxHealth) <= 0.3 and Color3.fromRGB(244, 63, 94) or Color3.fromRGB(52, 211, 153)
+        end
+    else
+        if espGui then espGui:Destroy() end
+    end
+end
+
+-- [MỤC 4 & 5] ENGINE ĐỒNG BỘ TỐC ĐỘ DI CHUYỂN VÀ PHÓNG TO HITBOX ĐỐI THỦ
+RunService.RenderStepped:Connect(function()
+    local char = player.Character
+    if not char or not char:FindFirstChild("Humanoid") then return end
+    
+    -- Xử lý tăng tốc độ chạy
+    if _G.SpeedPvP then 
+        char.Humanoid.WalkSpeed = TOC_DO_PVP 
+    else
+        if char.Humanoid.WalkSpeed == TOC_DO_PVP then char.Humanoid.WalkSpeed = 16 end
+    end
+    
+    -- Vòng lặp quét người chơi khác để cập nhật Hitbox và hiện máu
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            UpdateESP(p) -- Cập nhật chữ hiện máu lơ lửng trên đầu
+            
+            if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local targetRoot = p.Character.HumanoidRootPart
+                
+                -- Phóng to hộp va chạm đối thủ
+                if _G.HitboxPvP then
+                    targetRoot.Size = HITBOX_SIZE
+                    targetRoot.Transparency = 0.75
+                    targetRoot.Color = Color3.fromRGB(244, 63, 94) -- Hộp đỏ hồng
+                    targetRoot.CanCollide = false
+                else
+                    -- Trả về kích thước gốc khi tắt chức năng
+                    if targetRoot.Size == HITBOX_SIZE then
+                        targetRoot.Size = Vector3.new(2, 2, 1)
+                        targetRoot.Transparency = 1
+                        targetRoot.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+end)
