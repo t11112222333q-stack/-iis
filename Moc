@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🔮 MEMAYBEO HUB V8.22 - IMAGE BUTTON FIX (ALL-IN-ONE STEALTH)
+-- 🔮 MEMAYBEO HUB V8.22 - MODERN TOGGLE SWITCH FIX (OMNI STYLE)
 -- ============================================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -65,9 +65,8 @@ headerLine.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
 headerLine.BorderSizePixel = 0
 
 -- ============================================================================
--- CỤM CHỨC NĂNG THU NHỎ MENU (SỬA ĐƯỜNG DẪN LOAD ẢNH)
+-- CỤM CHỨC NĂNG THU NHỎ MENU
 -- ============================================================================
--- 1. Nút Thu Nhỏ (-) trên thanh tiêu đề
 local btnMinimize = Instance.new("TextButton", frame)
 btnMinimize.Size = UDim2.new(0, 28, 0, 28)
 btnMinimize.Position = UDim2.new(1, -38, 0, 8)
@@ -79,15 +78,11 @@ btnMinimize.TextColor3 = Color3.fromRGB(168, 85, 247)
 Instance.new("UICorner", btnMinimize).CornerRadius = UDim.new(0, 6)
 Instance.new("UIStroke", btnMinimize).Color = Color3.fromRGB(58, 58, 80)
 
--- 2. Nút Tròn chứa Logo (Đã sửa lại link rbxthumb tối ưu)
 local btnOpenContainer = Instance.new("ImageButton", screenGui)
 btnOpenContainer.Size = UDim2.new(0, 50, 0, 50)
 btnOpenContainer.Position = UDim2.new(0.05, 0, 0.2, 0)
 btnOpenContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
-
--- [SỬA LỖI TẠI ĐÂY]: Sử dụng API rbxthumb chuyên dụng để ép Roblox load hình từ Asset ID
 btnOpenContainer.Image = "https://www.roblox.com/asset-thumbnail/image?assetId=133010743962072&width=420&height=420&format=png"
-
 btnOpenContainer.ScaleType = Enum.ScaleType.Fit
 btnOpenContainer.Visible = false
 btnOpenContainer.Active = true
@@ -97,44 +92,32 @@ local openStroke = Instance.new("UIStroke", btnOpenContainer)
 openStroke.Color = Color3.fromRGB(147, 51, 234)
 openStroke.Thickness = 1.5
 
--- Sự kiện Thu Nhỏ
 btnMinimize.MouseButton1Click:Connect(function()
     btnOpenContainer.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y)
-    
     for _, child in pairs(frame:GetChildren()) do
-        if child:IsA("GuiObject") then
-            child.Visible = false
-        end
+        if child:IsA("GuiObject") then child.Visible = false end
     end
     stroke.Enabled = false 
-
     local tween = Tweens:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 0)})
     tween:Play()
     tween.Completed:Wait()
-    
     frame.Visible = false
     btnOpenContainer.Visible = true
 end)
 
--- Sự kiện Phóng To Lại
 btnOpenContainer.MouseButton1Click:Connect(function()
     frame.Position = UDim2.new(0, btnOpenContainer.AbsolutePosition.X, 0, btnOpenContainer.AbsolutePosition.Y)
     btnOpenContainer.Visible = false
     frame.Visible = true
-    
     local tween = Tweens:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 485)})
     tween:Play()
     tween.Completed:Wait()
-    
     stroke.Enabled = true 
     for _, child in pairs(frame:GetChildren()) do
-        if child:IsA("GuiObject") then
-            child.Visible = true
-        end
+        if child:IsA("GuiObject") then child.Visible = true end
     end
 end)
 
--- Kéo thả nút Logo tròn trên màn hình
 local dragToggle, toggleStart, startTogglePos
 btnOpenContainer.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = true; toggleStart = input.Position; startTogglePos = btnOpenContainer.Position end end)
 UIS.InputChanged:Connect(function(input) 
@@ -146,7 +129,7 @@ end)
 btnOpenContainer.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end end)
 
 ------------------------------------------------------------------------
--- Dòng hiển thị trạng thái Game (Status)
+-- Trạng thái Game / Radar
 local txtStatus = Instance.new("TextLabel", frame)
 txtStatus.Size = UDim2.new(1, -30, 0, 18)
 txtStatus.Position = UDim2.new(0, 15, 0, 52)
@@ -157,7 +140,6 @@ txtStatus.TextSize = 10
 txtStatus.TextColor3 = Color3.fromRGB(139, 92, 246)
 txtStatus.TextXAlignment = Enum.TextXAlignment.Left
 
--- Dòng hiển thị trạng thái Radar quét người
 local txtRadar = Instance.new("TextLabel", frame)
 txtRadar.Size = UDim2.new(1, -30, 0, 18)
 txtRadar.Position = UDim2.new(0, 15, 0, 70)
@@ -169,34 +151,24 @@ txtRadar.TextColor3 = Color3.fromRGB(156, 163, 175)
 txtRadar.TextXAlignment = Enum.TextXAlignment.Left
 
 -- ============================================================================
--- HÀM THAY ĐỔI / XÓA ĐỒNG THỜI CẢ TRÊN ĐẦU VÀ TRÊN PLAYERGUI
+-- KHU VỰC THAY ĐỔI TÊN PLAYER
 -- ============================================================================
 local function GetPlayerGuiNameLabel()
-    local success, result = pcall(function()
-        return player.PlayerGui.PlayerGui.NameLabel
-    end)
+    local success, result = pcall(function() return player.PlayerGui.PlayerGui.NameLabel end)
     return success and result or nil
 end
 
 local function UpdateAllNames(targetName)
     local guiLabel = GetPlayerGuiNameLabel()
     if guiLabel then guiLabel.Text = targetName end
-
     local char = player.Character or player.CharacterAdded:Wait()
     local hum = char:WaitForChild("Humanoid", 3)
     if hum then hum.DisplayName = targetName end
-    
     for _, desc in pairs(char:GetDescendants()) do
         if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
             for _, child in pairs(desc:GetDescendants()) do
                 if child:IsA("TextLabel") then
-                    if targetName == "" then
-                        desc.Enabled = false
-                        child.Text = ""
-                    else
-                        desc.Enabled = true
-                        child.Text = targetName
-                    end
+                    if targetName == "" then desc.Enabled = false; child.Text = "" else desc.Enabled = true; child.Text = targetName end
                 end
             end
         end
@@ -204,25 +176,17 @@ local function UpdateAllNames(targetName)
 end
 
 player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    rootPart = newChar:WaitForChild("HumanoidRootPart")
-    humanoid = newChar:WaitForChild("Humanoid")
-    task.wait(1.2)
-    UpdateAllNames(customNameStorage)
+    character = newChar; rootPart = newChar:WaitForChild("HumanoidRootPart"); humanoid = newChar:WaitForChild("Humanoid")
+    task.wait(1.2); UpdateAllNames(customNameStorage)
 end)
 
 task.spawn(function()
     while task.wait(2) do
         local guiLabel = GetPlayerGuiNameLabel()
-        if guiLabel and guiLabel.Text ~= customNameStorage then
-            guiLabel.Text = customNameStorage
-        end
+        if guiLabel and guiLabel.Text ~= customNameStorage then guiLabel.Text = customNameStorage end
     end
 end)
 
--- ============================================================================
--- THIẾT KẾ CỤM ĐỔI TÊN TRÊN MENU UI
--- ============================================================================
 local nameInput = Instance.new("TextBox", frame)
 nameInput.Size = UDim2.new(1, -125, 0, 32)
 nameInput.Position = UDim2.new(0, 15, 0, 95)
@@ -267,7 +231,7 @@ btnHideName.MouseButton1Click:Connect(function()
     txtStatus.TextColor3 = Color3.fromRGB(34, 197, 94)
 end)
 
--- HÀM KHỞI TẠO NÚT BẤM PREMIUM TWEEN
+-- HÀM KHỞI TẠO NÚT BẤM CƠ BẢN (DÀNH CHO CÁC CHỨC NĂNG KHÁC)
 local function createButton(text, pos, baseColor)
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, -30, 0, 38)
@@ -277,38 +241,53 @@ local function createButton(text, pos, baseColor)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 11
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BorderSizePixel = 0
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
-    local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(255, 255, 255)
-    btnStroke.Thickness = 1
-    btnStroke.Transparency = 0.9
-
-    btn.MouseEnter:Connect(function()
-        Tweens:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.15}):Play()
-        Tweens:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0.6}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        Tweens:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
-        Tweens:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0.9}):Play()
-    end)
-    
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tweens:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(1, -34, 0, 36), Position = UDim2.new(0, 17, 0, pos + 1)}):Play()
-        end
-    end)
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tweens:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(1, -30, 0, 38), Position = UDim2.new(0, 15, 0, pos)}):Play()
-        end
-    end)
-
     return btn
 end
 
-local toggleBtn   = createButton("🟢 BẬT AUTO FARM", 145, Color3.fromRGB(220, 38, 38))
+-- ============================================================================
+-- 🔘 THIẾT KẾ NÚT GẠT (TOGGLE SWITCH) CAPSULE CHO AUTO FARM THEO MẪU
+-- ============================================================================
+local toggleContainer = Instance.new("Frame", frame)
+toggleContainer.Size = UDim2.new(1, -30, 0, 44)
+toggleContainer.Position = UDim2.new(0, 15, 0, 145)
+toggleContainer.BackgroundColor3 = Color3.fromRGB(16, 16, 26)
+Instance.new("UICorner", toggleContainer).CornerRadius = UDim.new(0, 8)
+local containerStroke = Instance.new("UIStroke", toggleContainer)
+containerStroke.Color = Color3.fromRGB(25, 25, 38)
+
+local toggleLabel = Instance.new("TextLabel", toggleContainer)
+toggleLabel.Size = UDim2.new(0, 180, 1, 0)
+toggleLabel.Position = UDim2.new(0, 12, 0, 0)
+toggleLabel.BackgroundTransparency = 1
+toggleLabel.Text = "🤖 CHẾ ĐỘ AUTO FARM SYSTEM"
+toggleLabel.Font = Enum.Font.GothamBold
+toggleLabel.TextSize = 11
+toggleLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Khung bao ngoài nút gạt (Hình viên thuốc giống hệt ảnh mẫu)
+local switchBackground = Instance.new("TextButton", toggleContainer)
+switchBackground.Size = UDim2.new(0, 52, 0, 26)
+switchBackground.Position = UDim2.new(1, -64, 0.5, -13)
+switchBackground.BackgroundColor3 = Color3.fromRGB(127, 29, 29) -- Đỏ khi tắt
+switchBackground.Text = ""
+switchBackground.AutoButtonColor = false
+Instance.new("UICorner", switchBackground).CornerRadius = UDim.new(1, 0)
+
+local switchStroke = Instance.new("UIStroke", switchBackground)
+switchStroke.Color = Color3.fromRGB(0, 230, 255) -- Viền Neon Cyan phát sáng cực đẹp
+switchStroke.Thickness = 1.5
+
+-- Cục tròn di chuyển bên trong
+local switchBall = Instance.new("Frame", switchBackground)
+switchBall.Size = UDim2.new(0, 20, 0, 20)
+switchBall.Position = UDim2.new(0, 3, 0.5, -10) -- Nằm bên trái khi tắt
+switchBall.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", switchBall).CornerRadius = UDim.new(1, 0)
+
+------------------------------------------------------------------------
+-- CÁC NÚT CHỨC NĂNG PHÍA DƯỚI
 local btnCleanup  = createButton("✨ DỌN DẸP VẬT CẢN & HIỆU ỨNG", 200, Color3.fromRGB(14, 116, 144))
 local btnSave     = createButton("📌 LƯU VỊ TRÍ HIỆN TẠI", 255, Color3.fromRGB(217, 119, 6))
 local btnClear    = createButton("🗑️ XÓA VỊ TRÍ ĐÃ LƯU", 310, Color3.fromRGB(75, 85, 99))
@@ -317,23 +296,17 @@ local btnHop      = createButton("⚡ TỰ ĐỘNG ĐỔI SERVER", 365, Color3.f
 ------------------------------------------------------------------------
 -- KÉO MENU MƯỢT MÀ
 local dragging, dragStart, startPos
-frame.InputBegan:Connect(function(input) 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-        dragging = true; dragStart = input.Position; startPos = frame.Position 
-    end 
-end)
+frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; dragStart = input.Position; startPos = frame.Position end end)
 UIS.InputChanged:Connect(function(input) 
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
         local delta = input.Position - dragStart
-        Tweens:Create(frame, TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        }):Play()
+        Tweens:Create(frame, TweenInfo.new(0.08, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}):Play()
     end 
 end)
 UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
 
 ------------------------------------------------------------------------
--- RADAR & AUTO FARM
+-- LÕI THUẬT TOÁN LOGIC VÀ LOOP CỦA AUTO FARM
 local function ScanForPlayers()
     if not rootPart then return false, nil end
     for _, otherPlayer in pairs(Players:GetPlayers()) do
@@ -385,11 +358,14 @@ local function GetBoss()
     return (b and b:FindFirstChild("Hitbox") and b:FindFirstChildOfClass("Humanoid").Health > 0) and b or nil
 end
 
-toggleBtn.MouseButton1Click:Connect(function()
+-- Xử lý sự kiện bấm nút gạt (Xử lý hiệu ứng Tween di chuyển hạt tròn)
+switchBackground.MouseButton1Click:Connect(function()
     isAutoFarmEnabled = not isAutoFarmEnabled
+    
     if isAutoFarmEnabled then
-        toggleBtn.Text = "🔴 TẮT AUTO FARM"
-        Tweens:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(22, 163, 74)}):Play()
+        -- Kích hoạt Bật: Đổi nền sang xanh lá, trượt cục tròn sang phải
+        Tweens:Create(switchBackground, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(22, 163, 74)}):Play()
+        Tweens:Create(switchBall, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(1, -23, 0.5, -10)}):Play()
         
         farmConnection = RunService.Heartbeat:Connect(function(dt)
             local playerDetected, detectorName = ScanForPlayers()
@@ -411,8 +387,9 @@ toggleBtn.MouseButton1Click:Connect(function()
             end
         end)
     else
-        toggleBtn.Text = "🟢 BẬT AUTO FARM"
-        Tweens:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(220, 38, 38)}):Play()
+        -- Kích hoạt Tắt: Trả về nền đỏ, trượt cục tròn về bên trái ban đầu
+        Tweens:Create(switchBackground, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(127, 29, 29)}):Play()
+        Tweens:Create(switchBall, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 3, 0.5, -10)}):Play()
         if farmConnection then farmConnection:Disconnect() end
     end
 end)
