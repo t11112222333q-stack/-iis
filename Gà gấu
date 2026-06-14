@@ -1,0 +1,635 @@
+-- ============================================================================
+-- MATRIX EXCLUSIVE v43.7 HYBRID PRO - EM GUỘC AI REBORN (MINIMIZE FIX)
+-- ============================================================================
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local CG = game:GetService("CoreGui")
+local HS = game:GetService("HttpService")
+local Tweens = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local parent = pcall(function() return CG end) and CG or player:WaitForChild("PlayerGui", 5)
+
+-- Dọn dẹp phiên bản cũ
+pcall(function()
+    if CG:FindFirstChild("MatrixExclusiveV43_6") then CG.MatrixExclusiveV43_6:Destroy() end
+    if CG:FindFirstChild("MatrixExclusiveV43_7") then CG.MatrixExclusiveV43_7:Destroy() end
+end)
+
+-- CẤU HÌNH THUẬT TOÁN
+local betBase = 10000000
+local betCur = 10000000
+local betMulti = 2
+local confThres = 58 
+local winTarget = 150
+local loseMax = 3
+
+-- BIẾN TOÀN CỤC
+local history = {}
+local auto = false
+local betPlaced = false
+local lastPred = ""
+local wins = 0
+local loses = 0
+local frozen = false
+
+-- ĐẶT CƯỢC ENGINE
+local function execBet(side, amt)
+    if not auto then return end
+    task.spawn(function()
+        pcall(function()
+            local gaGauGui = player.PlayerGui:FindFirstChild("GaGauGui")
+            if not gaGauGui then return end
+            local frameGaGau = gaGauGui:FindFirstChild("FrameGaGau")
+            if not frameGaGau then return end
+
+            local targetBtn = (side == "Ga") and "ChonGa" or "ChonGau"
+            local targetInput = (side == "Ga") and "DienSoTienGa" or "DienSoTienGau"
+            local chon = frameGaGau:FindFirstChild(targetBtn)
+            local dienSoTien = frameGaGau:FindFirstChild(targetInput)
+            local xacNhan = frameGaGau:FindFirstChild("XacNhan")
+
+            if chon and dienSoTien and xacNhan then
+                for _, conn in pairs(getconnections(chon.MouseButton1Click)) do conn:Fire() end
+                task.wait(0.08)
+                dienSoTien.Text = tostring(math.floor(amt))
+                task.wait(0.08)
+                for _, conn in pairs(getconnections(xacNhan.MouseButton1Click)) do conn:Fire() end
+            end
+        end)
+    end)
+end
+
+-- BẢNG MÀU CHUYÊN NGHIỆP (Neon Cyan & Gold)
+local M_Bg = Color3.fromRGB(10, 14, 22)
+local M_Top = Color3.fromRGB(16, 24, 40)
+local M_Stroke = Color3.fromRGB(0, 230, 255)
+local M_Gold = Color3.fromRGB(241, 196, 15)
+local M_Text = Color3.fromRGB(220, 240, 255)
+
+-- KHỞI TẠO FRAME GIAO DIỆN V43.7
+local gui = Instance.new("ScreenGui")
+gui.Name = "MatrixExclusiveV43_7"
+gui.ResetOnSpawn = false
+gui.Parent = parent
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 340, 0, 580) 
+frame.Position = UDim2.new(0.5, -170, 0.5, -290)
+frame.BackgroundColor3 = M_Bg
+frame.BackgroundTransparency = 0.15
+frame.BorderSizePixel = 0
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = M_Stroke
+stroke.Thickness = 1.5
+
+-- KÉO THẢ MENU CHÍNH
+local drag, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+frame.InputEnded:Connect(function() drag = false end)
+UIS.InputChanged:Connect(function(input)
+    if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- THANH TIÊU ĐỀ
+local top = Instance.new("Frame", frame)
+top.Size = UDim2.new(1, 0, 0, 42)
+top.BackgroundColor3 = M_Top
+Instance.new("UICorner", top).CornerRadius = UDim.new(0, 12)
+
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1, -80, 1, 0)
+title.Position = UDim2.new(0, 14, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "MEMAYBEO HUB"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
+title.TextColor3 = M_Stroke
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local mini = Instance.new("TextButton", top)
+mini.Size = UDim2.new(0, 26, 0, 26)
+mini.Position = UDim2.new(1, -58, 0, 8)
+mini.Text = "—"
+mini.Font = Enum.Font.GothamBold
+mini.BackgroundColor3 = Color3.fromRGB(30, 42, 58)
+mini.TextColor3 = Color3.fromRGB(180, 220, 255)
+Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
+
+local close = Instance.new("TextButton", top)
+close.Size = UDim2.new(0, 26, 0, 26)
+close.Position = UDim2.new(1, -28, 0, 8)
+close.Text = "✕"
+close.Font = Enum.Font.GothamBold
+close.BackgroundColor3 = Color3.fromRGB(60, 25, 30)
+close.TextColor3 = Color3.fromRGB(255, 130, 130)
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+close.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+local cont = Instance.new("Frame", frame)
+cont.Size = UDim2.new(1, -16, 1, -54)
+cont.Position = UDim2.new(0, 8, 0, 46)
+cont.BackgroundTransparency = 1
+
+-- ============================================================================
+-- CỤM KHỞI TẠO NÚT TRÒN LOGO KHI THU NHỎ (FIX KHÔNG HIỆN HÌNH)
+-- ============================================================================
+local btnOpenContainer = Instance.new("ImageButton", gui)
+btnOpenContainer.Size = UDim2.new(0, 52, 0, 52)
+btnOpenContainer.Position = UDim2.new(0.5, -26, 0.5, -26)
+btnOpenContainer.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
+-- Sử dụng rbxthumb API để ép hệ thống render hình ảnh chính xác tuyệt đối
+btnOpenContainer.Image = "https://www.roblox.com/asset-thumbnail/image?assetId=133010743962072&width=420&height=420&format=png"
+btnOpenContainer.ScaleType = Enum.ScaleType.Fit
+btnOpenContainer.Visible = false
+btnOpenContainer.Active = true
+Instance.new("UICorner", btnOpenContainer).CornerRadius = UDim.new(1, 0)
+
+local openStroke = Instance.new("UIStroke", btnOpenContainer)
+openStroke.Color = M_Stroke
+openStroke.Thickness = 1.5
+
+-- [SỬA LỖI] Thuật toán Thu Nhỏ mượt mà, triệt tiêu lỗi lem đồ họa
+mini.MouseButton1Click:Connect(function()
+    btnOpenContainer.Position = UDim2.new(0, frame.AbsolutePosition.X + (frame.AbsoluteSize.X/2) - 26, 0, frame.AbsolutePosition.Y + 21)
+    
+    -- Ẩn nhanh phần tử con tránh đè lỗi hiển thị
+    for _, child in pairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") then child.Visible = false end
+    end
+    stroke.Enabled = false
+
+    local tween = Tweens:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 0)})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    frame.Visible = false
+    btnOpenContainer.Visible = true
+end)
+
+-- [SỬA LỖI] Thuật toán Phóng To phục hồi trạng thái nguyên bản
+btnOpenContainer.MouseButton1Click:Connect(function()
+    frame.Position = UDim2.new(0, btnOpenContainer.AbsolutePosition.X - (340/2) + 26, 0, btnOpenContainer.AbsolutePosition.Y - 21)
+    btnOpenContainer.Visible = false
+    frame.Visible = true
+    
+    local tween = Tweens:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 580)})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    stroke.Enabled = true
+    for _, child in pairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") then child.Visible = true end
+    end
+end)
+
+-- Kéo thả nút Logo tròn khi đang thu gọn để không vướng màn hình
+local dragToggle, toggleStart, startTogglePos
+btnOpenContainer.InputBegan:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        dragToggle = true; toggleStart = input.Position; startTogglePos = btnOpenContainer.Position 
+    end 
+end)
+UIS.InputChanged:Connect(function(input) 
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
+        local delta = input.Position - toggleStart
+        btnOpenContainer.Position = UDim2.new(startTogglePos.X.Scale, startTogglePos.X.Offset + delta.X, startTogglePos.Y.Scale, startTogglePos.Y.Offset + delta.Y)
+    end 
+end)
+btnOpenContainer.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end end)
+
+
+-- ============================================================================
+-- 🎀 EM GUỘC AI QUAY TRỞ LẠI (WELCOME BACK)
+-- ============================================================================
+local aiBox = Instance.new("Frame", cont)
+aiBox.Size = UDim2.new(1, 0, 0, 44)
+aiBox.Position = UDim2.new(0, 0, 0, 4)
+aiBox.BackgroundColor3 = Color3.fromRGB(16, 24, 48)
+Instance.new("UICorner", aiBox).CornerRadius = UDim.new(0, 8)
+local aiStroke = Instance.new("UIStroke", aiBox)
+aiStroke.Color = Color3.fromRGB(30, 41, 89)
+
+local aiMsg = Instance.new("TextLabel", aiBox)
+aiMsg.Size = UDim2.new(1, -12, 1, 0)
+aiMsg.Position = UDim2.new(0, 6, 0, 0)
+aiMsg.BackgroundTransparency = 1
+aiMsg.Text = "🤖 Em guộc AI bố chào con nếu thấy ngon nhớ lộc ~"
+aiMsg.Font = Enum.Font.GothamSemibold
+aiMsg.TextSize = 9
+aiMsg.TextColor3 = Color3.fromRGB(230, 240, 255)
+aiMsg.TextWrapped = true
+aiMsg.TextXAlignment = Enum.TextXAlignment.Left
+
+-- BẢNG HIỂN THỊ DỰ ĐOÁN CHÍNH
+local ketqua = Instance.new("TextLabel", cont)
+ketqua.Size = UDim2.new(1, 0, 0, 44)
+ketqua.Position = UDim2.new(0, 0, 0, 54)
+ketqua.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+ketqua.Text = "🔮 ĐANG PHÂN TÍCH CHU KỲ SÓNG..."
+ketqua.Font = Enum.Font.GothamBlack
+ketqua.TextSize = 11
+ketqua.TextColor3 = M_Stroke
+Instance.new("UICorner", ketqua).CornerRadius = UDim.new(0, 8)
+
+-- THANH TỶ LỆ PHẦN TRĂM DỰ ĐOÁN
+local probFrame = Instance.new("Frame", cont)
+probFrame.Size = UDim2.new(1, 0, 0, 22)
+probFrame.Position = UDim2.new(0, 0, 0, 104)
+probFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
+Instance.new("UICorner", probFrame).CornerRadius = UDim.new(0, 6)
+
+local barGa = Instance.new("Frame", probFrame)
+barGa.Size = UDim2.new(0.5, 0, 1, 0)
+barGa.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+Instance.new("UICorner", barGa).CornerRadius = UDim.new(0, 4)
+
+local barGau = Instance.new("Frame", probFrame)
+barGau.Size = UDim2.new(0.5, 0, 1, 0)
+barGau.Position = UDim2.new(0.5, 0, 0, 0)
+barGau.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+Instance.new("UICorner", barGau).CornerRadius = UDim.new(0, 4)
+
+local barLabel = Instance.new("TextLabel", probFrame)
+barLabel.Size = UDim2.new(1, 0, 1, 0)
+barLabel.BackgroundTransparency = 1
+barLabel.Text = "🐥 GÀ 50% | 🐻 GẤU 50%"
+barLabel.Font = Enum.Font.GothamBold
+barLabel.TextSize = 9
+barLabel.TextColor3 = Color3.new(1, 1, 1)
+
+-- KHU VỰC PHÂN TÍCH THUẬT TOÁN ĐA TẦNG
+local anaFrame = Instance.new("Frame", cont)
+anaFrame.Size = UDim2.new(1, 0, 0, 114)
+anaFrame.Position = UDim2.new(0, 0, 0, 132)
+anaFrame.BackgroundColor3 = Color3.fromRGB(13, 18, 30)
+Instance.new("UICorner", anaFrame).CornerRadius = UDim.new(0, 8)
+
+local anaTxt = {}
+local anaTitle = {"⏳ Nhận Dạng Cầu Nhảy 1-1", "🛡️ Tỷ Lệ Ép Bẻ Cầu Bệt", "📊 Tỷ Lệ Hồi Lưu Khuyết", "🧠 Phân Tích Nhịp Chu Kỳ", "📂 Database Khớp Vết"}
+for i = 1, 5 do
+    local t = Instance.new("TextLabel", anaFrame)
+    t.Size = UDim2.new(1, -12, 0, 18)
+    t.Position = UDim2.new(0, 6, 0, 4 + (i-1) * 22)
+    t.BackgroundTransparency = 1
+    t.Text = anaTitle[i] .. ": --"
+    t.Font = Enum.Font.GothamSemibold
+    t.TextSize = 9
+    t.TextColor3 = M_Text
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    anaTxt[i] = t
+end
+
+-- KHU VỰC CẤU HÌNH TĂNG TIỀN CƯỢC
+local configFrame = Instance.new("Frame", cont)
+configFrame.Size = UDim2.new(1, 0, 0, 36)
+configFrame.Position = UDim2.new(0, 0, 0, 264)
+configFrame.BackgroundTransparency = 1
+
+local baseBox = Instance.new("TextBox", configFrame)
+baseBox.Size = UDim2.new(0.5, -4, 1, 0)
+baseBox.Position = UDim2.new(0, 0, 0, 0)
+baseBox.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
+baseBox.Text = tostring(betBase)
+baseBox.TextColor3 = Color3.fromRGB(52, 211, 153)
+baseBox.Font = Enum.Font.GothamBold
+baseBox.TextSize = 10
+Instance.new("UICorner", baseBox).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", baseBox).Color = Color3.fromRGB(30, 41, 59)
+baseBox.FocusLost:Connect(function()
+    local val = tonumber(baseBox.Text)
+    if val and val > 0 then
+        betBase = val
+        if not betPlaced and loses == 0 then betCur = val end
+    else
+        baseBox.Text = tostring(betBase)
+    end
+end)
+
+local baseLabel = Instance.new("TextLabel", baseBox)
+baseLabel.Size = UDim2.new(1, 0, 0, 12)
+baseLabel.Position = UDim2.new(0, 0, 0, -14)
+baseLabel.BackgroundTransparency = 1
+baseLabel.Text = "💵 TIỀN CƯỢC GỐC (BASE)"
+baseLabel.Font = Enum.Font.GothamBold
+baseLabel.TextSize = 8
+baseLabel.TextColor3 = Color3.fromRGB(156, 163, 175)
+
+local multiBox = Instance.new("TextBox", configFrame)
+multiBox.Size = UDim2.new(0.5, -4, 1, 0)
+multiBox.Position = UDim2.new(0.5, 4, 0, 0)
+multiBox.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
+multiBox.Text = tostring(betMulti)
+multiBox.TextColor3 = M_Gold
+multiBox.Font = Enum.Font.GothamBold
+multiBox.TextSize = 10
+Instance.new("UICorner", multiBox).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", multiBox).Color = Color3.fromRGB(30, 41, 59)
+multiBox.FocusLost:Connect(function()
+    local val = tonumber(multiBox.Text)
+    if val and val >= 1 then
+        betMulti = val
+    else
+        multiBox.Text = tostring(betMulti)
+    end
+end)
+
+local multiLabel = Instance.new("TextLabel", multiBox)
+multiLabel.Size = UDim2.new(1, 0, 0, 12)
+multiLabel.Position = UDim2.new(0, 0, 0, -14)
+multiLabel.BackgroundTransparency = 1
+multiLabel.Text = "✖ HỆ SỐ NHÂN (KHI THUA)"
+multiLabel.Font = Enum.Font.GothamBold
+multiLabel.TextSize = 8
+multiLabel.TextColor3 = Color3.fromRGB(156, 163, 175)
+
+-- THÔNG SỐ TRẠNG THÁI HỆ THỐNG
+local countText = Instance.new("TextLabel", cont)
+countText.Size = UDim2.new(1, 0, 0, 22)
+countText.Position = UDim2.new(0, 0, 0, 308)
+countText.BackgroundColor3 = Color3.fromRGB(22, 28, 45)
+countText.Text = "🐥 Gà: 0 | 🐻 Gấu: 0"
+countText.Font = Enum.Font.GothamBold
+countText.TextSize = 10
+countText.TextColor3 = M_Text
+Instance.new("UICorner", countText).CornerRadius = UDim.new(0, 6)
+
+local hisText = Instance.new("TextLabel", cont)
+hisText.Size = UDim2.new(1, 0, 0, 22)
+hisText.Position = UDim2.new(0, 0, 0, 334)
+hisText.BackgroundColor3 = Color3.fromRGB(18, 24, 38)
+hisText.Text = "📜 Lịch sử: [---]"
+hisText.Font = Enum.Font.Gotham
+hisText.TextSize = 9
+hisText.TextColor3 = Color3.fromRGB(160, 190, 220)
+Instance.new("UICorner", hisText).CornerRadius = UDim.new(0, 6)
+
+local timeText = Instance.new("TextLabel", cont)
+timeText.Size = UDim2.new(1, 0, 0, 22)
+timeText.Position = UDim2.new(0, 0, 0, 360)
+timeText.BackgroundColor3 = Color3.fromRGB(20, 32, 55)
+timeText.Text = "⏱️ XUNG NHỊP GAME: --"
+timeText.Font = Enum.Font.GothamSemibold
+timeText.TextSize = 10
+timeText.TextColor3 = M_Stroke
+Instance.new("UICorner", timeText).CornerRadius = UDim.new(0, 6)
+
+local betText = Instance.new("TextLabel", cont)
+betText.Size = UDim2.new(1, 0, 0, 22)
+betText.Position = UDim2.new(0, 0, 0, 386)
+betText.BackgroundColor3 = Color3.fromRGB(12, 36, 28)
+betText.Text = "💰 Cược Hiện Tại: 10M"
+betText.Font = Enum.Font.GothamSemibold
+betText.TextSize = 10
+betText.TextColor3 = Color3.fromRGB(52, 211, 153)
+Instance.new("UICorner", betText).CornerRadius = UDim.new(0, 6)
+
+local winText = Instance.new("TextLabel", cont)
+winText.Size = UDim2.new(1, 0, 0, 22)
+winText.Position = UDim2.new(0, 0, 0, 412)
+winText.BackgroundColor3 = Color3.fromRGB(45, 22, 28)
+winText.Text = "🏆 Thắng: 0/150 | Thua lt: 0"
+winText.Font = Enum.Font.GothamBold
+winText.TextSize = 9
+winText.TextColor3 = Color3.fromRGB(248, 113, 113)
+Instance.new("UICorner", winText).CornerRadius = UDim.new(0, 6)
+
+local moneyText = Instance.new("TextLabel", cont)
+moneyText.Size = UDim2.new(1, 0, 0, 22)
+moneyText.Position = UDim2.new(0, 0, 0, 438)
+moneyText.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
+moneyText.Text = "💰 Số Dư Tài Khoản: --"
+moneyText.Font = Enum.Font.GothamBold
+moneyText.TextSize = 10
+moneyText.TextColor3 = M_Gold
+Instance.new("UICorner", moneyText).CornerRadius = UDim.new(0, 6)
+
+local autoBtn = Instance.new("TextButton", cont)
+autoBtn.Size = UDim2.new(1, 0, 0, 38)
+autoBtn.Position = UDim2.new(0, 0, 0, 470)
+autoBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
+autoBtn.Text = "▶ KÍCH HOẠT MEMAYBEOHUB"
+autoBtn.Font = Enum.Font.GothamBlack
+autoBtn.TextSize = 11
+autoBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", autoBtn).CornerRadius = UDim.new(0, 8)
+
+-- ============================================================================
+-- LÕI THUẬT TOÁN ĐA TẦNG
+-- ============================================================================
+local function deepAnalysis()
+    for i = 1, 5 do anaTxt[i].Text = anaTitle[i] .. ": --" end
+    if #history < 3 then return "Ga", 50 end
+    
+    local scoreGa, scoreGau = 0, 0
+    local lastSide = history[#history]
+
+    -- TẦNG 1: THUẬN THEO NHỊP CẦU NHẢY 1-1
+    if #history >= 3 then
+        local l1, l2, l3 = history[#history], history[#history-1], history[#history-2]
+        if l1 ~= l2 and l2 ~= l3 then
+            if l1 == "Ga" then
+                scoreGau = scoreGau + 3.0
+                anaTxt[1].Text = anaTitle[1] .. ": Khớp nhịp nhảy 1-1 -> Chọn GẤU (+3.0)"
+                aiMsg.Text = "🤖 Em guộc AI: Cầu 1-1 kìa thằng lồn! Theo nhịp GẤU ngay!"
+            else
+                scoreGa = scoreGa + 3.0
+                anaTxt[1].Text = anaTitle[1] .. ": Khớp nhịp nhảy 1-1 -> Chọn GÀ (+3.0)"
+                aiMsg.Text = "🤖 Em guộc AI: Nhịp nhảy 1-1 mượt quá, lệnh này bám GÀ nhe đại ca!"
+            end
+        else
+            anaTxt[1].Text = anaTitle[1] .. ": Nhịp cầu đang chạy tự do"
+        end
+    end
+
+    -- TẦNG 2: TỶ LỆ ÉP BẺ CẦU BỆT DÀI
+    local streak = 1
+    for i = #history - 1, 1, -1 do
+        if history[i] == lastSide then streak = streak + 1 else break end
+    end
+
+    if streak >= 3 then
+        local breakMultiplier = 1.0 + (streak * 1.5)
+        if lastSide == "Ga" then
+            scoreGau = scoreGau + breakMultiplier
+            anaTxt[2].Text = string.format("%s: GÀ bệt dài (%d cây) -> ÉP BẺ GẤU (+%.1f)", anaTitle[2], streak, breakMultiplier)
+            aiMsg.Text = string.format("🤖 Em guộc AI: Gà bệt %d cây rồi, sòng chuẩn bị hồi Gấu, lực bẻ đang tăng!", streak)
+        else
+            scoreGa = scoreGa + breakMultiplier
+            anaTxt[2].Text = string.format("%s: GẤU bệt dài (%d cây) -> ÉP BẺ GÀ (+%.1f)", anaTitle[2], streak, breakMultiplier)
+            aiMsg.Text = string.format("🤖 Em guộc AI: Gấu bệt dai quá (%d cây), em tính toán lực ép bẻ Gà cực căng!", streak)
+        end
+    else
+        anaTxt[2].Text = anaTitle[2] .. ": Độ dài chuỗi bệt bình thường"
+    end
+
+    -- TẦNG 3: MẬT ĐỘ DIỆN RỘNG (CÁI NÀO RA ÍT THÌ THEO)
+    local cGa, cGau = 0, 0
+    local scanRange = math.min(25, #history)
+    for i = #history - scanRange + 1, #history do
+        if history[i] == "Ga" then cGa = cGa + 1 else cGau = cGau + 1 end
+    end
+    if cGa ~= cGau then
+        local densityBonus = math.abs(cGa - cGau) * 0.7
+        if cGa > cGau then
+            scoreGau = scoreGau + densityBonus
+            anaTxt[3].Text = string.format("%s: GẤU lép vế -> Ưu tiên hồi GẤU (+%.1f)", anaTitle[3], densityBonus)
+        else
+            scoreGa = scoreGa + densityBonus
+            anaTxt[3].Text = string.format("%s: GÀ lép vế -> Ưu tiên hồi GÀ (+%.1f)", anaTitle[3], densityBonus)
+        end
+    else
+        anaTxt[3].Text = anaTitle[3] .. ": Sòng cân bằng tỉ lệ khuyết"
+    end
+
+    -- TẦNG 4 & 5
+    if #history >= 3 then
+        local m1, m2 = history[#history], history[#history-1]
+        local tGa, tGau = 0, 0
+        for i = 1, #history - 2 do
+            if history[i] == m2 and history[i+1] == m1 then
+                if history[i+2] == "Ga" then tGa = tGa + 1 else tGau = tGau + 1 end
+            end
+        end
+        if tGa + tGau > 0 then
+            if tGa > tGau then scoreGau = scoreGau + 1.2 else scoreGa = scoreGa + 1.2 end
+        end
+    end
+    anaTxt[4].Text = anaTitle[4] .. ": Đang tính toán nhịp xung vận hành"
+    anaTxt[5].Text = anaTitle[5] .. ": Lõi Matrix đồng bộ dữ liệu"
+
+    local totalScore = scoreGa + scoreGau
+    if totalScore == 0 then return (lastSide == "Ga" and "Gau" or "Ga"), 50 end
+    
+    local finalProbGa = (scoreGa / totalScore) * 100
+    finalProbGa = math.clamp(finalProbGa, 15, 85)
+    
+    barGa.Size = UDim2.new(finalProbGa / 100, 0, 1, 0)
+    barGau.Size = UDim2.new((100 - finalProbGa) / 100, 0, 1, 0)
+    barGau.Position = UDim2.new(finalProbGa / 100, 0, 0, 0)
+    barLabel.Text = string.format("🐥 GÀ %.0f%% | 🐻 GẤU %.0f%%", finalProbGa, 100 - finalProbGa)
+
+    if scoreGa > scoreGau then
+        return "Ga", 50 + math.floor((scoreGa / totalScore) * 45)
+    else
+        return "Gau", 50 + math.floor((scoreGau / totalScore) * 45)
+    end
+end
+
+local function updateUI()
+    local ga, gau, emo = 0, 0, {}
+    for i = math.max(1, #history - 9), #history do
+        if history[i] == "Ga" then ga = ga + 1; table.insert(emo, "🐥") else gau = gau + 1; table.insert(emo, "🐻") end
+    end
+    countText.Text = "🐥 Gà: " .. ga .. " | 🐻 Gấu: " .. gau
+    hisText.Text = #emo > 0 and "📜 Lịch sử: " .. table.concat(emo, " ") or "📜 Lịch sử: [---]"
+    local leader = player:FindFirstChild("leaderstats")
+    local vnd = leader and leader:FindFirstChild("VND")
+    moneyText.Text = "💰 Số Dư Tài Khoản: " .. string.format("%.0f", vnd and vnd.Value or 0) .. " VND"
+    betText.Text = "💰 Cược Hiện Tại: " .. (betCur >= 1e6 and string.format("%.1fM", betCur / 1e6) or tostring(betCur))
+end
+
+-- REALTIME NETWORK SYNC
+task.spawn(function()
+    local remote = RS:WaitForChild("Remote", 10)
+    if not remote then return end
+    local upd = remote:WaitForChild("GaGauUpdate", 10)
+    if not upd then return end
+
+    upd.OnClientEvent:Connect(function(act, ...)
+        local args = { ... }
+        if act == "Countdown" then
+            local sec = args[1]
+            timeText.Text = "⏱️ XUNG NHỊP GAME: " .. sec .. "s"
+            
+            if sec == 25 and auto and not betPlaced and not frozen then
+                local side, conf = deepAnalysis()
+                if conf >= confThres then
+                    lastPred = side
+                    betPlaced = true
+                    ketqua.Text = string.format("🔮 MEMAYBEOHUB CHỌN: %s\n📊 ĐỘ TỰ TIN: %d%%", side == "Ga" and "🐥 GÀ" or "🐻 GẤU", conf)
+                    execBet(side, betCur)
+                else
+                    ketqua.Text = string.format("🔮 BỎ QUA PHIÊN NÀY (%d%% < %d%%)", conf, confThres)
+                end
+            end
+        elseif act == "Result" then
+            local winner = args[1]
+            if not winner then return end
+            local clean = (string.lower(winner) == "gau") and "Gau" or "Ga"
+
+            if lastPred ~= "" and betPlaced then
+                if lastPred == clean then
+                    wins = wins + 1
+                    loses = 0
+                    betCur = betBase
+                    frozen = false
+                    aiMsg.Text = "🤖 Em guộc AI: Địt mẹ game tuổi con cặc ngon ko em."
+                else
+                    loses = loses + 1
+                    if loses >= loseMax then
+                        frozen = true
+                        betCur = betBase
+                        aiMsg.Text = "🤖 Em guộc AI: Cái lồn mẹ nó game như cặc!"
+                    else
+                        betCur = betCur * betMulti
+                        aiMsg.Text = string.format("🤖 Em guộc AI: Cầu gãy rồi thằng ngu để bố tính!", betMulti)
+                    end
+                end
+                winText.Text = string.format("🏆 Thắng: %d/%d | Thua lt: %d", wins, winTarget, loses)
+            end
+
+            table.insert(history, clean)
+            if #history > 35 then table.remove(history, 1) end
+            updateUI()
+
+            lastPred = ""
+            betPlaced = false
+            if wins >= winTarget then
+                autoBtn.Text = "🏆 ĐÃ ĐẠT CHỈ TIÊU HOÀN THÀNH!"
+                autoBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+                auto = false
+                aiMsg.Text = "🤖 Em guộc AI: Nghỉ đi thằng lồn địt mẹ tham thì thua nếu thắng mua key tiếp nhé!"
+            end
+        elseif act == "SyncState" then
+            local data = args[1] or {}
+            if data.history then
+                table.clear(history)
+                for _, v in ipairs(data.history) do
+                    table.insert(history, (string.lower(tostring(v)) == "gau") and "Gau" or "Ga")
+                end
+                while #history > 35 do table.remove(history, 1) end
+                updateUI()
+            end
+        end
+    end)
+    upd:FireServer("RequestSync")
+end)
+
+-- ĐIỀU KHIỂN BẬT TẮT
+autoBtn.MouseButton1Click:Connect(function()
+    if wins >= winTarget then return end
+    auto = not auto
+    if auto then
+        autoBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+        autoBtn.Text = "⏸ ĐANG CHẠY MEMAYBEOHUB PRO"
+        frozen = false; betPlaced = false
+    else
+        autoBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
+        autoBtn.Text = "▶ KÍCH HOẠT MEMAYBEOHUB PRO"
+    end
+end)
+
+updateUI()
+
