@@ -1,11 +1,12 @@
 -- ============================================================================
--- MATRIX EXCLUSIVE v43.7 HYBRID PRO - EM GUỘC AI REBORN
+-- MATRIX EXCLUSIVE v43.7 HYBRID PRO - EM GUỘC AI REBORN (MINIMIZE FIX)
 -- ============================================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("ReplicatedStorage")
 local CG = game:GetService("CoreGui")
 local HS = game:GetService("HttpService")
+local Tweens = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local parent = pcall(function() return CG end) and CG or player:WaitForChild("PlayerGui", 5)
@@ -74,7 +75,7 @@ gui.ResetOnSpawn = false
 gui.Parent = parent
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 340, 0, 580) -- Nới rộng chiều cao để vừa cả AI lẫn ô cấu hình tiền
+frame.Size = UDim2.new(0, 340, 0, 580) 
 frame.Position = UDim2.new(0.5, -170, 0.5, -290)
 frame.BackgroundColor3 = M_Bg
 frame.BackgroundTransparency = 0.15
@@ -86,7 +87,7 @@ local stroke = Instance.new("UIStroke", frame)
 stroke.Color = M_Stroke
 stroke.Thickness = 1.5
 
--- KÉO THẢ MENU
+-- KÉO THẢ MENU CHÍNH
 local drag, dragStart, startPos
 frame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -140,6 +141,74 @@ local cont = Instance.new("Frame", frame)
 cont.Size = UDim2.new(1, -16, 1, -54)
 cont.Position = UDim2.new(0, 8, 0, 46)
 cont.BackgroundTransparency = 1
+
+-- ============================================================================
+-- CỤM KHỞI TẠO NÚT TRÒN LOGO KHI THU NHỎ (FIX KHÔNG HIỆN HÌNH)
+-- ============================================================================
+local btnOpenContainer = Instance.new("ImageButton", gui)
+btnOpenContainer.Size = UDim2.new(0, 52, 0, 52)
+btnOpenContainer.Position = UDim2.new(0.5, -26, 0.5, -26)
+btnOpenContainer.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
+-- Sử dụng rbxthumb API để ép hệ thống render hình ảnh chính xác tuyệt đối
+btnOpenContainer.Image = "https://www.roblox.com/asset-thumbnail/image?assetId=133010743962072&width=420&height=420&format=png"
+btnOpenContainer.ScaleType = Enum.ScaleType.Fit
+btnOpenContainer.Visible = false
+btnOpenContainer.Active = true
+Instance.new("UICorner", btnOpenContainer).CornerRadius = UDim.new(1, 0)
+
+local openStroke = Instance.new("UIStroke", btnOpenContainer)
+openStroke.Color = M_Stroke
+openStroke.Thickness = 1.5
+
+-- [SỬA LỖI] Thuật toán Thu Nhỏ mượt mà, triệt tiêu lỗi lem đồ họa
+mini.MouseButton1Click:Connect(function()
+    btnOpenContainer.Position = UDim2.new(0, frame.AbsolutePosition.X + (frame.AbsoluteSize.X/2) - 26, 0, frame.AbsolutePosition.Y + 21)
+    
+    -- Ẩn nhanh phần tử con tránh đè lỗi hiển thị
+    for _, child in pairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") then child.Visible = false end
+    end
+    stroke.Enabled = false
+
+    local tween = Tweens:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 0)})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    frame.Visible = false
+    btnOpenContainer.Visible = true
+end)
+
+-- [SỬA LỖI] Thuật toán Phóng To phục hồi trạng thái nguyên bản
+btnOpenContainer.MouseButton1Click:Connect(function()
+    frame.Position = UDim2.new(0, btnOpenContainer.AbsolutePosition.X - (340/2) + 26, 0, btnOpenContainer.AbsolutePosition.Y - 21)
+    btnOpenContainer.Visible = false
+    frame.Visible = true
+    
+    local tween = Tweens:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 580)})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    stroke.Enabled = true
+    for _, child in pairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") then child.Visible = true end
+    end
+end)
+
+-- Kéo thả nút Logo tròn khi đang thu gọn để không vướng màn hình
+local dragToggle, toggleStart, startTogglePos
+btnOpenContainer.InputBegan:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        dragToggle = true; toggleStart = input.Position; startTogglePos = btnOpenContainer.Position 
+    end 
+end)
+UIS.InputChanged:Connect(function(input) 
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then 
+        local delta = input.Position - toggleStart
+        btnOpenContainer.Position = UDim2.new(startTogglePos.X.Scale, startTogglePos.X.Offset + delta.X, startTogglePos.Y.Scale, startTogglePos.Y.Offset + delta.Y)
+    end 
+end)
+btnOpenContainer.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end end)
+
 
 -- ============================================================================
 -- 🎀 EM GUỘC AI QUAY TRỞ LẠI (WELCOME BACK)
@@ -506,13 +575,13 @@ task.spawn(function()
                     loses = 0
                     betCur = betBase
                     frozen = false
-                    aiMsg.Text = "🤖 Em guộc AI: địt mẹ game tuổi con cặc ngon ko em."
+                    aiMsg.Text = "🤖 Em guộc AI: Địt mẹ game tuổi con cặc ngon ko em."
                 else
                     loses = loses + 1
                     if loses >= loseMax then
                         frozen = true
                         betCur = betBase
-                        aiMsg.Text = "🤖 Em guộc AI: cái lồn mẹ nó game như cặc!"
+                        aiMsg.Text = "🤖 Em guộc AI: Cái lồn mẹ nó game như cặc!"
                     else
                         betCur = betCur * betMulti
                         aiMsg.Text = string.format("🤖 Em guộc AI: Cầu gãy rồi thằng ngu để bố tính!", betMulti)
@@ -560,14 +629,6 @@ autoBtn.MouseButton1Click:Connect(function()
         autoBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
         autoBtn.Text = "▶ KÍCH HOẠT MEMAYBEOHUB PRO"
     end
-end)
-
-local minimized = false
-mini.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    cont.Visible = not minimized
-    frame.Size = minimized and UDim2.new(0, 340, 0, 42) or UDim2.new(0, 340, 0, 580)
-    mini.Text = minimized and "＋" or "—"
 end)
 
 updateUI()
