@@ -1,0 +1,135 @@
+-- ============================================================================
+-- MEMAYBEO HUB V98.0 - BẢN TỐI ƯU TỐC ĐỘ VÀNG (SPEED 380)
+-- ============================================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- Khởi tạo Menu
+local playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild("DeliveryGui") then playerGui.DeliveryGui:Destroy() end
+
+local gui = Instance.new("ScreenGui", playerGui)
+gui.Name = "DeliveryGui"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size, frame.Position = UDim2.new(0, 220, 0, 100), UDim2.new(0.5, -110, 0.5, -50)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active, frame.Draggable = true, true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", frame).Color = Color3.fromRGB(0, 255, 128)
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(0.9, 0, 0.7, 0)
+btn.Position = UDim2.new(0.05, 0, 0.15, 0)
+btn.Text = "START AUTO DELIVERY"
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 14
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+_G.Auto = false
+btn.MouseButton1Click:Connect(function()
+    _G.Auto = not _G.Auto
+    btn.Text = _G.Auto and "STOP AUTO" or "START AUTO"
+    btn.BackgroundColor3 = _G.Auto and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(0, 150, 0)
+end)
+
+-- LÕI NO-CLIP XUYÊN TƯỜNG (Giúp bay thẳng không tốn thời gian né vật cản)
+RunService.Stepped:Connect(function()
+    if _G.Auto and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == true then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- ENGINE BAY TỐC ĐỘ VÀNG (Đã tăng lên 380)
+local function optimalTeleport(targetCFrame)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.Velocity = Vector3.new(0,0,0)
+        local dist = (root.Position - targetCFrame.Position).Magnitude
+        
+        -- CÀI ĐẶT TỐC ĐỘ TẠI ĐÂY (380 là tốc độ lướt cực mượt và an toàn)
+        local speed = 380 
+        
+        local tween = TweenService:Create(root, TweenInfo.new(dist / speed, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+-- VÒNG LẶP CHÍNH
+task.spawn(function()
+    while task.wait(0.3) do -- Quét nhanh hơn (0.3 giây) để chuyển đổi trạng thái lẹ hơn
+        if _G.Auto then
+            pcall(function()
+                local char = player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+                
+                local delievery = workspace.JobGame.Delievery
+                
+                -- Kiểm tra mũi tên chỉ đường
+                local arrowSpawn = delievery:FindFirstChild("ArrowSpawn")
+                local arrow = arrowSpawn and (arrowSpawn:FindFirstChild(player.Name.."-Grab") or arrowSpawn:FindFirstChild("anhbaaccphu10-Grab"))
+                local hasArrow = arrow and arrow:FindFirstChild("Arrow")
+                
+                -- Kiểm tra thùng hàng
+                local hasBox = char:FindFirstChild("GrabBox", true) or player.Backpack:FindFirstChild("GrabBox", true)
+                
+                -- CHẾ ĐỘ 1: ĐI NHẬN HÀNG
+                if not hasBox and not hasArrow then
+                    local myTargetPos = CFrame.new(-240.144531, -146.25, -580.035645, -1, 0, 0, 0, 1, 0, 0, 0, -1)
+                    optimalTeleport(myTargetPos)
+                    task.wait(0.2) -- Giảm thời gian khựng từ 0.5s xuống 0.2s
+                    
+                    local npcGrab = delievery.NpcGrab
+                    optimalTeleport(npcGrab:GetPivot() * CFrame.new(0, 1, 0))
+                    task.wait(0.1)
+                    
+                    -- Tìm nút nhận
+                    local nhanBtn = nil
+                    for _, child in pairs(npcGrab:GetChildren()) do
+                        if child:IsA("ProximityPrompt") or child:IsA("ClickDetector") or string.match(child.Name, "^Nh") then
+                            nhanBtn = child
+                            break
+                        end
+                    end
+                    
+                    if nhanBtn then
+                        if nhanBtn:IsA("ProximityPrompt") then fireproximityprompt(nhanBtn)
+                        elseif nhanBtn:IsA("ClickDetector") then fireclickdetector(nhanBtn) end
+                        pcall(function() for _, c in pairs(getconnections(nhanBtn.MouseButton1Click)) do c:Fire() end end)
+                    end
+                    task.wait(1.0) -- Chờ 1 giây cố định để game kịp đưa hộp hàng vào túi
+                    
+                -- CHẾ ĐỘ 2: ĐI GIAO HÀNG TỐC ĐỘ VÀNG
+                else
+                    if hasArrow then
+                        -- Bay nhanh thẳng đến mũi tên
+                        optimalTeleport(arrow.Arrow.CFrame)
+                        task.wait(0.1) -- Khựng nhẹ 0.1s để server xác nhận vị trí
+                        
+                        -- Tự kích hoạt trả đơn
+                        for _, dest in pairs(delievery.Vitri:GetChildren()) do
+                            if (char.HumanoidRootPart.Position - dest:GetPivot().Position).Magnitude < 15 then
+                                local p = dest:FindFirstChildWhichIsA("ProximityPrompt", true) or dest:FindFirstChildWhichIsA("ClickDetector", true)
+                                if p then
+                                    if p:IsA("ProximityPrompt") then fireproximityprompt(p)
+                                    else fireclickdetector(p) end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
