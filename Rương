@@ -1,0 +1,216 @@
+-- ============================================================================
+-- 📦 AUTO LOOT CHEST V12.3 - ANTI-FALL DAMAGE & SAFE LANDING ENGINE
+-- MODE: L-SHAPE FLY | SPEED: 77 -> 15 (SMOOTH LANDING) | NO MORE DEATH
+-- ============================================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+local guiName = "AutoLootChest"
+
+if playerGui:FindFirstChild(guiName) then playerGui:FindFirstChild(guiName):Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = guiName
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 160)
+frame.Position = UDim2.new(0.02, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 18, 35)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(255, 200, 50)
+stroke.Thickness = 2
+
+-- Kéo thả menu
+local drag = false
+local dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+frame.InputEnded:Connect(function() drag = false end)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if drag and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "📦 AUTO LOOT CHEST V12.3"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 13
+title.TextColor3 = Color3.fromRGB(255, 200, 50)
+
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 40)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.28, 0)
+toggleBtn.Text = "▶ BẮT ĐẦU SĂN (ANTI-DEATH)"
+toggleBtn.Font = Enum.Font.GothamBlack
+toggleBtn.TextSize = 13
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local statusText = Instance.new("TextLabel", frame)
+statusText.Size = UDim2.new(0.9, 0, 0, 25)
+statusText.Position = UDim2.new(0.05, 0, 0.68, 0)
+statusText.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+statusText.Text = "🟢 Hệ thống sẵn sàng"
+statusText.Font = Enum.Font.Gotham
+statusText.TextSize = 10
+statusText.TextColor3 = Color3.fromRGB(0, 255, 150)
+Instance.new("UICorner", statusText).CornerRadius = UDim.new(0, 4)
+
+gui.Parent = playerGui
+_G.AutoLoot = false
+local currentTween = nil
+
+-- KHÓA VẬN TỐC RƠI TỰ DO BẰNG 0 LIÊN TỤC ĐỂ KHÔNG BỊ TÍNH FALL DAMAGE
+RunService.Stepped:Connect(function()
+    if _G.AutoLoot and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+                if part.Name == "HumanoidRootPart" then
+                    part.Velocity = Vector3.new(0, 0, 0) -- Triệt tiêu gia tốc rơi
+                end
+            end
+        end
+    end
+end)
+
+-- BỘ LỌC CHỈ TÌM RƯƠNG CHÍNH CHỦ
+local function findValidChestOnly()
+    local jobGame = workspace:FindFirstChild("JobGame")
+    local suKien = jobGame and jobGame:FindFirstChild("SuKien")
+    local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
+    
+    if dropLoot then
+        for _, child in pairs(dropLoot:GetChildren()) do
+            if child:IsA("Model") or child:IsA("BasePart") then
+                local nameLower = string.lower(child.Name)
+                if not string.find(nameLower, "drop") then
+                    return child
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ENGINE BAY CHỮ L CHỐNG SÁT THƯƠNG RƠI
+local function safeAntiFallFlyTo(targetPos)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then return end
+    
+    local normalSpeed = 77
+    local landingSpeed = 15 -- 🛡️ Tốc độ rà phanh cực chậm khi tiếp đất để né chết oan
+    local startPos = root.Position
+    
+    -- BƯỚC 1: BAY VỌT THẲNG ĐỨNG LÊN TRỜI (+45 BLOCK)
+    local skyStartPos = Vector3.new(startPos.X, startPos.Y + 45, startPos.Z)
+    currentTween = TweenService:Create(root, TweenInfo.new((root.Position - skyStartPos).Magnitude / normalSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(skyStartPos)})
+    currentTween:Play()
+    currentTween.Completed:Wait()
+    if not _G.AutoLoot then return end
+
+    -- BƯỚC 2: DI CHUYỂN TRÊN KHÔNG ĐẾN ĐỈNH ĐẦU RƯƠNG
+    local skyTargetPos = Vector3.new(targetPos.X, skyStartPos.Y, targetPos.Z)
+    currentTween = TweenService:Create(root, TweenInfo.new((root.Position - skyTargetPos).Magnitude / normalSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(skyTargetPos)})
+    currentTween:Play()
+    currentTween.Completed:Wait()
+    if not _G.AutoLoot then return end
+
+    -- BƯỚC 3: ĐÁP XUỐNG ĐIỂM CHỜ TRÊN CAO CÁCH RƯƠNG 8 BLOCK (VẪN CHẠY TỐC ĐỘ NHANH)
+    local breakPointPos = Vector3.new(targetPos.X, targetPos.Y + 8, targetPos.Z)
+    currentTween = TweenService:Create(root, TweenInfo.new((root.Position - breakPointPos).Magnitude / normalSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(breakPointPos)})
+    currentTween:Play()
+    currentTween.Completed:Wait()
+    if not _G.AutoLoot then return end
+
+    -- BƯỚC 4: RÀ PHANH TỪ TỪ ĐÁP XUỐNG TÂM RƯƠNG (SPEED 15) CHỐNG DIE
+    currentTween = TweenService:Create(root, TweenInfo.new((root.Position - targetPos).Magnitude / landingSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos + Vector3.new(0, 1.2, 0))})
+    currentTween:Play()
+    currentTween.Completed:Wait()
+end
+
+-- VÒNG LẶP PHỤC KÍCH RƯƠNG THỜI GIAN THỰC
+local lootTask = nil
+local function startLoot()
+    if lootTask then task.cancel(lootTask) end
+    
+    lootTask = task.spawn(function()
+        while _G.AutoLoot do
+            pcall(function()
+                -- Kiểm tra trạng thái nếu nhân vật lỡ bị bất tỉnh trước đó thì không chạy
+                local char = player.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health <= 0 then 
+                    statusText.Text = "❌ Bạn đã chết/bất tỉnh! Chờ hồi sinh..."
+                    statusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+                    task.wait(1) 
+                    return 
+                end
+
+                local chestObject = findValidChestOnly()
+                if chestObject then
+                    local targetPos = chestObject:GetPivot().Position
+                    local prompt = chestObject:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    
+                    statusText.Text = "⚡ ANTI-FALL: Đang đáp chữ L xuống " .. chestObject.Name
+                    statusText.TextColor3 = Color3.fromRGB(255, 200, 50)
+                    
+                    safeAntiFallFlyTo(targetPos)
+                    task.wait(0.05)
+                    
+                    -- Gom quà an toàn
+                    if prompt then
+                        fireproximityprompt(prompt)
+                        task.wait(0.15)
+                        fireproximityprompt(prompt)
+                    else
+                        local backupOpen = chestObject:FindFirstChild("Open") and chestObject.Open:FindFirstChildWhichIsA("ProximityPrompt")
+                        if backupOpen then fireproximityprompt(backupOpen) end
+                    end
+                    task.wait(0.4)
+                else
+                    statusText.Text = "⏳ Đang phục kích... Đã bật rà phanh tiếp đất an toàn!"
+                    statusText.TextColor3 = Color3.fromRGB(0, 255, 255)
+                end
+            end)
+            task.wait(0.05)
+        end
+    end)
+end
+
+-- ========== SỰ KIỆN NÚT BẤM MENU ==========
+toggleBtn.MouseButton1Click:Connect(function()
+    _G.AutoLoot = not _G.AutoLoot
+    if _G.AutoLoot then
+        toggleBtn.Text = "⏹ DỪNG SĂN"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        startLoot()
+    else
+        toggleBtn.Text = "▶ BẮT ĐẦU SĂN (ANTI-DEATH)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+        statusText.Text = "🔴 Đã dừng"
+        statusText.TextColor3 = Color3.fromRGB(150, 150, 150)
+        if currentTween then currentTween:Cancel() end
+        if lootTask then task.cancel(lootTask) end
+    end
+end)
+
