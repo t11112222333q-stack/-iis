@@ -397,3 +397,24 @@ end)
 btnSave.MouseButton1Click:Connect(function() savedCFrame = rootPart.CFrame end)
 btnClear.MouseButton1Click:Connect(function() savedCFrame = nil end)
 btnHop.MouseButton1Click:Connect(function() HopToLowestServer() end)
+-- ============================================================================
+-- ANTI-AFK ENGINE V8.22 (BẢO VỆ TÀI KHOẢN KHÔNG BỊ DISCONNECT)
+-- ============================================================================
+local VirtualUser = game:GetService("VirtualUser")
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+    txtStatus.Text = "Trạng thái: Đã chặn AFK thành công!"
+    task.wait(1)
+    txtStatus.Text = "Trạng thái: Sẵn sàng hành động"
+end)
+
+-- Bổ sung thêm vòng lặp heartbeat nhỏ để đảm bảo Anti-AFK ổn định
+task.spawn(function()
+    while task.wait(300) do -- Cứ mỗi 5 phút thực hiện thao tác nhỏ
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.JumpPower = 50
+            player.Character.Humanoid.Jump = true
+        end
+    end
+end)
