@@ -1,0 +1,556 @@
+-- ============================================================================
+-- ⚔️ MEMAYBEO HUB - VERSION V25.0 (FLY BYPASS & NO-CLIP GOD MODE)
+-- ============================================================================
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- CONFIG SPEED BYPASS
+getgenv().CHEST_SPEED_TWEEN = 75 
+getgenv().GRAB_SPEED_TWEEN = 60 
+
+getgenv().HitBoxX = 5
+getgenv().HitBoxY = 5
+getgenv().HitBoxZ = 5
+
+local HITBOX_SIZE_RED = Vector3.new(15, 15, 15)
+local PHAN_THUONG_CFRAME = 0.15
+local TOC_DO_MAC_DINH = 16
+local NGUONG_MAU_YEU = 95 
+local AIMLOCK_RADIUS = 35 
+local VNIL_VECTOR = Vector3.new(-240.144531, -143.0, -580.035645) 
+
+-- TỌA ĐỘ BỆNH VIỆN ĐỂ KHỬ KHU VỰC LỖI
+local HOSPITAL_POSITION = Vector3.new(150, -145, 200)
+
+local toolBoxes = {}
+local folderESP = workspace:FindFirstChild("ESP") or Instance.new("Folder", workspace)
+folderESP.Name = "ESP"
+
+local Window = Fluent:CreateWindow({
+    Title = "MEMAYBEO HUB V25.0",
+    SubTitle = "Fly Bypass & NoClip",
+    TabWidth = 140,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.End
+})
+
+-- ============================================================================
+-- 📱 NÚT ẨN HIỆN CHÍNH CHỦ
+-- ============================================================================
+local screenGui = Instance.new("ScreenGui", playerGui)
+screenGui.Name = "FluentMobileToggle"
+screenGui.ResetOnSpawn = false
+local toggleBtn = Instance.new("ImageButton", screenGui)
+toggleBtn.Size = UDim2.fromOffset(50, 50)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+toggleBtn.Image = "rbxassetid://4483345998"
+toggleBtn.Active = true
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+local btnStroke = Instance.new("UIStroke", toggleBtn)
+btnStroke.Color = Color3.fromRGB(225, 29, 72)
+btnStroke.Thickness = 1.5
+
+local dragging, dragInput, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true dragStart = input.Position startPos = toggleBtn.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+    end
+end)
+toggleBtn.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end end)
+UIS.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+
+toggleBtn.MouseButton1Click:Connect(function() Window:Minimize() end)
+
+local Tabs = {
+    Farm = Window:AddTab({ Title = "Farm", Icon = "rbxassetid://4483345998" }),
+    PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" })
+}
+
+-- ============================================================================
+-- ✈️ TWEEN ENGINE DYNAMIC
+-- ============================================================================
+local function bypassTweenEngine(targetPos, speed, checkGlobalVariable, ignoreHeight)
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum or hum.Health <= 1 then return end
+
+    local finalTargetPos = targetPos
+    if not ignoreHeight then
+        finalTargetPos = Vector3.new(targetPos.X, -137.5, targetPos.Z)
+    end
+
+    local distance = (root.Position - finalTargetPos).Magnitude
+    if distance < 1.5 then return end 
+
+    local duration = distance / speed
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+    local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(finalTargetPos)})
+    
+    tween:Play()
+
+    local lastPos = root.Position
+    local stuckTicks = 0
+
+    while tween.PlaybackState == Enum.PlaybackState.Playing and _G[checkGlobalVariable] do
+        if hum.Health <= 1 then
+            tween:Cancel()
+            break
+        end
+
+        if (root.Position - lastPos).Magnitude < 0.2 then
+            stuckTicks = stuckTicks + 1
+            if stuckTicks > 40 then 
+                if ignoreHeight then
+                    root.CFrame = root.CFrame * CFrame.new(0, 2, -2)
+                else
+                    root.CFrame = root.CFrame * CFrame.new(0, 4, -5) 
+                end
+                stuckTicks = 0
+            end
+        else
+            stuckTicks = 0
+        end
+        lastPos = root.Position
+
+        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        root.AssemblyAngularVelocity = Vector3.new(0,0,0)
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- ============================================================================
+-- 🏹 REALTIME ARROW FILTER
+-- ============================================================================
+local function getActiveDeliveryArrow()
+    local delieveryFolder = workspace:FindFirstChild("JobGame") and workspace.JobGame:FindFirstChild("Delievery")
+    local arrowSpawn = delieveryFolder and delieveryFolder:FindFirstChild("ArrowSpawn")
+    if not arrowSpawn then return nil end
+
+    for _, folder in pairs(arrowSpawn:GetChildren()) do
+        if string.find(folder.Name, localPlayer.Name) or string.find(folder.Name, "Grab") then
+            local arrow = folder:FindFirstChild("Arrow") or folder:FindFirstChildWhichIsA("BasePart", true)
+            if arrow then
+                if (arrow.Position - HOSPITAL_POSITION).Magnitude > 90 then 
+                    return arrow 
+                end
+            end
+        end
+    end
+
+    for _, desc in pairs(arrowSpawn:GetDescendants()) do
+        if (desc.Name == "Arrow" or desc:IsA("MeshPart") or desc:IsA("BasePart")) and desc.Transparency < 0.9 then
+            if (desc.Position - HOSPITAL_POSITION).Magnitude > 90 then
+                return desc
+            end
+        end
+    end
+    return nil
+end
+
+-- ============================================================================
+-- INTERFACE TAB FARM
+-- ============================================================================
+local SectionDelivery = Tabs.Farm:AddSection("Auto Job Delivery (Fly Mode)")
+_G.AutoDeliveryRunning = false
+SectionDelivery:AddToggle("RunDelivery", { Title = "Bật Giao Hàng (Bay Xuyên Tường V25)", Default = false, Callback = function(state) _G.AutoDeliveryRunning = state end })
+SectionDelivery:AddSlider("TweenSpeedGrab", { Title = "Tốc độ di chuyển Grab", Min = 20, Max = 150, Default = 60, Rounding = 1, Callback = function(v) getgenv().GRAB_SPEED_TWEEN = v end })
+
+local SectionChest = Tabs.Farm:AddSection("Auto Loot Chest")
+_G.AutoLoot = false
+SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương Toàn Bản Đồ", Default = false, Callback = function(state) _G.AutoLoot = state end })
+
+-- ÉP TRẠNG THÁI NO-COLLIDE LIÊN TỤC TRÊN MỖI KHUNG HÌNH
+RunService.Stepped:Connect(function()
+    if (_G.AutoDeliveryRunning or _G.AutoLoot) and localPlayer.Character then
+        local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum:GetState() ~= Enum.HumanoidStateType.Running then 
+            hum:ChangeState(Enum.HumanoidStateType.Running) 
+        end
+        for _, part in pairs(localPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then 
+                part.CanCollide = false 
+            end
+        end
+    end
+end)
+
+-- LOOP CHẠY AUTO DELIVERY
+task.spawn(function()
+    while true do
+        task.wait(0.01)
+        if _G.AutoDeliveryRunning then
+            pcall(function()
+                local char = localPlayer.Character 
+                local root = char and char:FindFirstChild("HumanoidRootPart") 
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if not root or not hum or hum.Health <= 1 then return end
+                
+                local grabBoxInChar = char:FindFirstChild("GrabBox") 
+                local grabBoxInBackpack = localPlayer.Backpack:FindFirstChild("GrabBox")
+                local hasBox = grabBoxInChar or grabBoxInBackpack
+                local delieveryFolder = workspace.JobGame.Delievery
+                
+                if grabBoxInChar then
+                    for _, p in pairs(grabBoxInChar:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
+                end
+
+                if not hasBox then
+                    if (root.Position - VNIL_VECTOR).Magnitude > 8 then 
+                        bypassTweenEngine(VNIL_VECTOR, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false) 
+                    else
+                        local npc = delieveryFolder:FindFirstChild("NpcGrab")
+                        if npc then 
+                            root.CFrame = npc:GetPivot() * CFrame.new(0, 0, 2)
+                            root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                            local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true) or npc:FindFirstChild("Nh\225\186\173n")
+                            if prompt then 
+                                prompt.MaxActivationDistance = 100
+                                prompt.RequiresLineOfSight = false
+                                repeat
+                                    fireproximityprompt(prompt)
+                                    task.wait(0.2)
+                                until localPlayer.Backpack:FindFirstChild("GrabBox") or char:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
+                            end 
+                        end
+                    end
+                else
+                    if grabBoxInBackpack and not grabBoxInChar then 
+                        hum:EquipTool(grabBoxInBackpack) 
+                    end
+                    
+                    local activeArrow = getActiveDeliveryArrow()
+                    
+                    if activeArrow then
+                        bypassTweenEngine(activeArrow.Position, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false)
+                        
+                        local vitriFolder = delieveryFolder:FindFirstChild("Vitri") or delieveryFolder
+                        for _, dest in pairs(vitriFolder:GetDescendants()) do
+                            if dest:IsA("ProximityPrompt") or dest.Name:sub(1,14) == "DeliveryPrompt" then
+                                local parentPart = dest.Parent
+                                if parentPart and parentPart:IsA("BasePart") then
+                                    local dist2D = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(parentPart.Position.X, 0, parentPart.Position.Z)).Magnitude
+                                    if dist2D < 22 then
+                                        root.CFrame = parentPart:GetPivot() * CFrame.new(0, 1.5, 0)
+                                        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                                        dest.MaxActivationDistance = 150
+                                        dest.RequiresLineOfSight = false
+                                        repeat
+                                            fireproximityprompt(dest)
+                                            task.wait(0.15)
+                                        until not char:FindFirstChild("GrabBox") and not localPlayer.Backpack:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- LOOP LOOT CHEST MỚI: CHUẨN BAY TRÊN TRỜI XONG TELEPORT THẲNG ĐẾN RƯƠNG THẦN TỐC
+local function findValidChestOnly()
+    local jobGame = workspace:FindFirstChild("JobGame")
+    local suKien = jobGame and jobGame:FindFirstChild("SuKien")
+    local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
+    if dropLoot then
+        -- Quét tìm mô hình Chest có chứa đúng cấu trúc thư mục yêu cầu của bạn
+        for _, child in pairs(dropLoot:GetChildren()) do
+            if child:IsA("Model") or child:IsA("BasePart") then
+                if not string.find(string.lower(child.Name), "drop") then 
+                    return child 
+                end
+            end
+        end
+    end
+    return nil
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.01)
+        if _G.AutoLoot then
+            pcall(function()
+                local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
+                local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health <= 1 then task.wait(1) return end
+                
+                local chest = findValidChestOnly()
+                if chest and root and hum then
+                    local targetPivot = chest:GetPivot()
+                    
+                    -- BƯỚC 1: Bay lên độ cao an toàn trên không trung trước (ngay phía trên tọa độ X, Z của rương)
+                    local skyPos = Vector3.new(targetPivot.Position.X, -137.5, targetPivot.Position.Z)
+                    root.CFrame = CFrame.new(skyPos)
+                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    task.wait(0.05) -- Chờ tích tắc phản hồi vị trí
+                    
+                    -- BƯỚC 2: Teleport thẳng tắp từ trên cao đáp xuống vị trí rương / Prompt nhận
+                    root.CFrame = targetPivot
+                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    
+                    -- Ưu tiên tìm Prompt trong mục Open["2"] như bạn yêu cầu, nếu không thấy sẽ tự quét ProximityPrompt gần nhất
+                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) 
+                    if not prompt then
+                        prompt = chest:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    end
+                    
+                    if prompt then 
+                        prompt.MaxActivationDistance = 150 
+                        prompt.RequiresLineOfSight = false 
+                        repeat
+                            fireproximityprompt(prompt)
+                            task.wait(0.1)
+                        until not chest.Parent or not _G.AutoLoot
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ============================================================================
+-- ĐOẠN CODE PVP / ESP GIỮ NGUYÊN HOÀN TOÀN LOGIC CỦA BẠN
+-- ============================================================================
+local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox")
+SectionHitbox:AddInput("BoxX", { Title = "Hit Box Size X", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 5 end })
+SectionHitbox:AddInput("BoxY", { Title = "Hit Box Size Y", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 5 end })
+SectionHitbox:AddInput("BoxZ", { Title = "Hit Box Size Z", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxZ = tonumber(val) or 5 end })
+SectionHitbox:AddButton({
+    Title = "Kích Hoạt Hitbox Vũ Khí (Bản Thân)",
+    Callback = function()
+        if localPlayer.Character then
+            for _, tool in ipairs(localPlayer.Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local targetPart = tool:FindFirstChild("Hitbox") or tool:FindFirstChild("Handle")
+                    if targetPart then
+                        targetPart.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ)
+                        local box = targetPart:FindFirstChild("MMB_SelectionBox") or Instance.new("SelectionBox", targetPart)
+                        box.Name = "MMB_SelectionBox" box.Adornee = targetPart box.LineThickness = 0.05 box.Color3 = Color3.fromRGB(0, 255, 0)
+                    end
+                end
+            end
+        end
+    end
+})
+
+local SectionFeatures = Tabs.PvP:AddSection("Chức Năng Hỗ Trợ Chiến Đấu")
+local autoToolState = false
+SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh (Cầm Tool)", Default = false, Callback = function(state) autoToolState = state end })
+task.spawn(function()
+    while true do
+        task.wait(0.01)
+        if autoToolState and localPlayer.Character then
+            local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then pcall(function() tool:Activate() end) end
+        end
+    end
+end)
+
+_G.HitboxPvP = false SectionFeatures:AddToggle("HitboxRed", { Title = "Mở Rộng Hitbox Địch (Hộp Đỏ MMB)", Default = false, Callback = function(state) _G.HitboxPvP = state end })
+_G.SpeedPvP = false SectionFeatures:AddToggle("BypassSpeed", { Title = "Bypass Speed (Mượt - Chống Choáng)", Default = false, Callback = function(state) _G.SpeedPvP = state end })
+_G.AutoHeal = false SectionFeatures:AddToggle("AutoHeal", { Title = "Tự Động Băng Gạc (Hồi Ngầm - Giữ Vũ Khí)", Default = false, Callback = function(state) _G.AutoHeal = state end })
+
+task.spawn(function()
+    while true do
+        task.wait(0.18)
+        if _G.AutoHeal and localPlayer.Character then
+            local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 and (humanoid.Health / humanoid.MaxHealth) * 100 <= NGUONG_MAU_YEU then
+                pcall(function()
+                    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                            local n = obj.Name:lower()
+                            if n:match("heal") or n:match("gac") or n:match("bang") or n:match("band") or n:match("med") or n:match("use") or n:match("item") then
+                                if obj:IsA("RemoteEvent") then obj:FireServer("Băng Gạc") obj:FireServer() else obj:InvokeServer("Băng Gạc") obj:InvokeServer() end
+                            end
+                        end
+                    end
+                    local toolGac = localPlayer.Backpack:FindFirstChild("Băng Gạc") or localPlayer.Backpack:FindFirstChild("Bandage") or localPlayer.Backpack:FindFirstChild("Medkit")
+                    if toolGac then toolGac:Activate() end
+                end)
+            end
+        end
+    end
+end)
+
+local spinSpeed = 5 local spinConnection
+SectionFeatures:AddSlider("SpinSpeed", { Title = "Tốc độ Spin", Min = 1, Max = 1000, Default = 5, Rounding = 1, Callback = function(val) spinSpeed = val end })
+SectionFeatures:AddToggle("PvPSpin", {
+    Title = "PvP Spin", Default = false,
+    Callback = function(state)
+        if spinConnection then spinConnection:Disconnect() end
+        if state then
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = false end
+            spinConnection = RunService.Heartbeat:Connect(function() local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") if root then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0) end end)
+        else
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = true end
+        end
+    end
+})
+
+local SectionAim = Tabs.PvP:AddSection("Hệ Thống Khóa Mục Tiêu")
+_G.AimlockPvP = false SectionAim:AddToggle("AimlockMMB", { Title = "Aimlock Theo Bán Kính", Default = false, Callback = function(state) _G.AimlockPvP = state end })
+
+local aimPlayerState = false local currentTargetName = "None" local aimConnection
+local TargetButton = SectionAim:AddButton({
+    Title = "Chọn Mục Tiêu Chỉ Định", Description = "Mục tiêu hiện tại: None",
+    Callback = function()
+        local playerList = {}
+        for _, p in ipairs(Players:GetPlayers()) do if p ~= localPlayer then table.insert(playerList, p.Name) end end
+        if #playerList == 0 then Fluent:Notify({ Title = "Thông báo", Content = "Không tìm thấy ai!", Duration = 3 }) return end
+        local options = {}
+        for _, name in ipairs(playerList) do table.insert(options, { Text = name, Callback = function() currentTargetName = name TargetButton:SetDesc("Mục tiêu hiện tại: " .. name) end }) end
+        Window:Dialog({ Title = "Hệ thống Target", Content = "Chọn người chơi:", Buttons = options })
+    end
+})
+
+SectionAim:AddToggle("AimPlayerXenox", {
+    Title = "Khóa Tâm Nhìn (Target)", Default = false,
+    Callback = function(state)
+        aimPlayerState = state if aimConnection then aimConnection:Disconnect() end
+        if state then
+            aimConnection = RunService.RenderStepped:Connect(function()
+                if currentTargetName ~= "None" and localPlayer.Character then
+                    local target = Players:FindFirstChild(currentTargetName) local localRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if target and target.Character and target.Character:FindFirstChild("Head") and localRoot then
+                        local head = target.Character.Head localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(head.Position.X, localRoot.Position.Y, head.Position.Z))
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local function getClosestPlayer()
+    local closestPlayer = nil local shortestDistance = AIMLOCK_RADIUS
+    local localChar = localPlayer.Character local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+            if p.Character.Humanoid.Health > 0 then
+                local distance = (localRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then shortestDistance = distance closestPlayer = p end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function createPlayerESP(targetPlayer)
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local root = targetPlayer.Character.HumanoidRootPart
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameESP_" .. targetPlayer.Name billboard.Size = UDim2.new(0, 150, 0, 35) billboard.Adornee = root billboard.AlwaysOnTop = true billboard.MaxDistance = 2000 billboard.Parent = folderESP
+    local label = Instance.new("TextLabel", billboard)
+    label.Size = UDim2.fromScale(1, 1) label.BackgroundTransparency = 0.5 label.BackgroundColor3 = Color3.new(0, 0, 0) label.Text = targetPlayer.Name label.TextColor3 = Color3.new(1, 0, 0) label.TextScaled = true label.Font = Enum.Font.SourceSansBold
+    local line = Drawing.new("Line") line.Visible = true line.Color = Color3.new(1, 0, 0) line.Thickness = 2
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not _G.ESPToggleState or not targetPlayer.Parent or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            line.Visible = false line:Delete() billboard:Destroy() connection:Disconnect() return
+        end
+        local cam = workspace.CurrentCamera
+        local targetPos, onScreen1 = cam:WorldToViewportPoint(root.Position)
+        local localPos, onScreen2 = cam:WorldToViewportPoint(localPlayer.Character.HumanoidRootPart.Position)
+        if onScreen1 and onScreen2 then line.From = Vector2.new(localPos.X, localPos.Y) line.To = Vector2.new(targetPos.X, targetPos.Y) line.Visible = true billboard.Enabled = true else line.Visible = false billboard.Enabled = false end
+    end)
+end
+
+local function applyHealthESP(character)
+    local head = character:FindFirstChild("Head") local hum = character:FindFirstChildOfClass("Humanoid")
+    if head and hum and not head:FindFirstChild("HealthESP") then
+        local billboard = Instance.new("BillboardGui", head) billboard.Name = "HealthESP" billboard.Size = UDim2.new(4, 0, 1.5, 0) billboard.StudsOffset = Vector3.new(0, 3, 0) billboard.AlwaysOnTop = true
+        local bgFrame = Instance.new("Frame", billboard) bgFrame.Size = UDim2.new(1, 0, 0.2, 0) bgFrame.Position = UDim2.new(0, 0, 0.5, 0) bgFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        local bar = Instance.new("Frame", bgFrame) bar.Name = "HealthBar" bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0) bar.Size = UDim2.new(1, 0, 1, 0)
+        local txt = Instance.new("TextLabel", billboard) txt.Name = "HPText" txt.Size = UDim2.new(1, 0, 0.5, 0) txt.Position = UDim2.new(0, 0, 0, -10) txt.BackgroundTransparency = 1 txt.TextColor3 = Color3.fromRGB(255, 255, 255) txt.Font = Enum.Font.SourceSansBold txt.TextScaled = true
+    end
+end
+
+local SectionESP = Tabs.PvP:AddSection("Hệ Thống Định Vị (ESP)")
+_G.ESPToggleState = false
+SectionESP:AddToggle("ESPLineName", { Title = "Hiển Thị ESP Line & Tên", Default = false, Callback = function(state) _G.ESPToggleState = state if not state then folderESP:ClearAllChildren() end end })
+task.spawn(function() while true do task.wait(2) if _G.ESPToggleState then for _, p in ipairs(Players:GetPlayers()) do if p ~= localPlayer and not folderESP:FindFirstChild("NameESP_" .. p.Name) then createPlayerESP(p) end end end end end)
+
+local toolHitboxESPState = false SectionESP:AddToggle("ToolHitboxESP", { Title = "Vòng Hitbox Vũ Khí Địch", Default = false, Callback = function(state) toolHitboxESPState = state if not state then for tool, box in pairs(toolBoxes) do if box and box.Parent then box:Destroy() end end toolBoxes = {} end end })
+local healthESPState = false SectionESP:AddToggle("HealthESP", { Title = "Thanh Máu Đối Thủ", Default = false, Callback = function(state) healthESPState = state if not state then for _, p in ipairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("HealthESP") then p.Character.Head.HealthESP:Destroy() end end end end })
+
+RunService.Heartbeat:Connect(function()
+    local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChild("Humanoid")
+    if not char or not root or not hum then return end
+    
+    if _G.SpeedPvP then
+        if hum.WalkSpeed < TOC_DO_MAC_DINH then hum.WalkSpeed = TOC_DO_MAC_DINH end
+        if hum.MoveDirection.Magnitude > 0 and root.AssemblyLinearVelocity.Magnitude < 45 then 
+            root.CFrame = root.CFrame + (hum.MoveDirection * PHAN_THUONG_CFRAME) 
+        end
+    end
+    
+    if _G.AimlockPvP and not aimPlayerState then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+        end
+    end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Character then
+            local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                if _G.HitboxPvP then
+                    targetRoot.Size = HITBOX_SIZE_RED targetRoot.Transparency = 0.75 targetRoot.Color = Color3.fromRGB(244, 63, 94) targetRoot.CanCollide = false
+                else
+                    if targetRoot.Size == HITBOX_SIZE_RED then targetRoot.Size = Vector3.new(2, 2, 1) targetRoot.Transparency = 1 targetRoot.CanCollide = true end
+                end
+            end
+            if toolHitboxESPState then
+                for _, child in ipairs(p.Character:GetChildren()) do
+                    if child:IsA("Tool") then
+                        local handle = child:FindFirstChild("Handle") or child:FindFirstChild("Hitbox")
+                        if handle and not toolBoxes[child] then
+                            local sBox = Instance.new("SelectionBox", handle)
+                            sBox.Name = "GlobalToolHitbox" sBox.Adornee = handle sBox.LineThickness = 0.04 sBox.Color3 = Color3.fromRGB(0, 255, 0) sBox.SurfaceTransparency = 0.9
+                            toolBoxes[child] = sBox
+                        end
+                    end
+                end
+            end
+            if healthESPState then
+                applyHealthESP(p.Character)
+                local tHum = p.Character:FindFirstChildOfClass("Humanoid") local tHead = p.Character:FindFirstChild("Head")
+                if tHum and tHead and tHead:FindFirstChild("HealthESP") then
+                    local esp = tHead.HealthESP local bar = esp.Frame.HealthBar local percentage = math.clamp(tHum.Health / tHum.MaxHealth, 0, 1)
+                    bar.Size = UDim2.new(percentage, 0, 1, 0)
+                    bar.BackgroundColor3 = percentage > 0.6 and Color3.fromRGB(0, 255, 0) or (percentage > 0.3 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0))
+                    esp.HPText.Text = math.floor(tHum.Health) .. "/" .. math.floor(tHum.MaxHealth)
+                end
+            end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character then for _, child in ipairs(p.Character:GetChildren()) do if toolBoxes[child] then toolBoxes[child]:Destroy() toolBoxes[child] = nil end end end
+end)
+
+Window:SelectTab(1)
+Fluent:Notify({ Title = "MEMAYBEO HUB V25.0", Content = "Sky Fly & Sky Teleport Chest kích hoạt!", Duration = 5 })
+
