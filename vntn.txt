@@ -1,0 +1,714 @@
+
+-- ============================================================================
+-- ⚔️ MEMAYBEO HUB - VERSION V28.2 (REMASTERED CHEST BYPASS & GÀ GẤU HYBRID PRO)
+-- ============================================================================
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- ============================================================================
+-- BIẾN CẤU HÌNH & TRẠNG THÁI TOÀN CỤC (PVP & FARM)
+-- ============================================================================
+getgenv().HitBoxX = 5
+getgenv().HitBoxY = 5
+getgenv().HitBoxZ = 5
+
+local HITBOX_SIZE_RED = Vector3.new(15, 15, 15)
+local NGUONG_MAU_YEU = 95 
+local AIMLOCK_RADIUS = 35 
+getgenv().BypassVelocitySpeed = 65 
+
+local KHOANG_CACH_TIEP_CAN = 20
+local TOC_DO_BAY_FARM = 0.2
+local BAN_KINH_SCAN_NGUOI = 150 
+local isAutoFarmEnabled = false
+local farmConnection = nil
+local tickXoay = 0
+local savedCFrame = nil
+local customNameStorage = ""
+
+local toolBoxes = {}
+local folderESP = workspace:FindFirstChild("ESP") or Instance.new("Folder", workspace)
+folderESP.Name = "ESP"
+
+-- ============================================================================
+-- BIẾN CẤU HÌNH & TRẠNG THÁI TOÀN CỤC (GÀ GẤU MATRIX AI)
+-- ============================================================================
+local betBase = 10000000
+local betCur = 10000000
+local betMulti = 2
+local confThres = 58 
+local winTarget = 150
+local loseMax = 3
+
+local history = {}
+local autoGaGau = false
+local betPlaced = false
+local lastPred = ""
+local wins = 0
+local loses = 0
+local frozen = false
+
+-- ============================================================================
+-- KHỞI TẠO MENU CHÍNH (FLUENT)
+-- ============================================================================
+local Window = Fluent:CreateWindow({
+    Title = "MEMAYBEO HUB V28.2",
+    SubTitle = "Fixed Chest Update & Matrix GaGau AI Reborn",
+    TabWidth = 140,
+    Size = UDim2.fromOffset(620, 480),
+    Acrylic = false, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.End
+})
+
+-- ============================================================================
+-- NÚT ẨN HIỆN CHÍNH CHỦ (MOBILE TOGGLE)
+-- ============================================================================
+local screenGui = Instance.new("ScreenGui", playerGui)
+screenGui.Name = "FluentMobileToggle"
+screenGui.ResetOnSpawn = false
+local toggleBtn = Instance.new("ImageButton", screenGui)
+toggleBtn.Size = UDim2.fromOffset(50, 50)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+toggleBtn.Image = "rbxassetid://4483345998"
+toggleBtn.Active = true
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+local btnStroke = Instance.new("UIStroke", toggleBtn)
+btnStroke.Color = Color3.fromRGB(225, 29, 72)
+btnStroke.Thickness = 1.5
+
+local dragging, dragInput, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true dragStart = input.Position startPos = toggleBtn.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+    end
+end)
+toggleBtn.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end end)
+UIS.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    Window:Minimize(not Window.Minimized)
+end)
+
+-- KHỞI TẠO TABS
+local Tabs = {
+    PvP = Window:AddTab({ Title = "PvP Combat", Icon = "rbxassetid://4483345998" }),
+    FarmBoss = Window:AddTab({ Title = "Farm Boss", Icon = "rbxassetid://10734950339" }),
+    GaGau = Window:AddTab({ Title = "Gà Gấu AI", Icon = "rbxassetid://10888331510" })
+}
+
+-- ============================================================================
+-- LOGIC VÀ INTERFACE TAB: PVP COMBAT
+-- ============================================================================
+local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox")
+SectionHitbox:AddInput("BoxX", { Title = "Hit Box Size X", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 5 end })
+SectionHitbox:AddInput("BoxY", { Title = "Hit Box Size Y", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 5 end })
+SectionHitbox:AddInput("BoxZ", { Title = "Hit Box Size Z", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxZ = tonumber(val) or 5 end })
+SectionHitbox:AddButton({
+    Title = "Kích Hoạt Hitbox Vũ Khí (Bản Thân)",
+    Callback = function()
+        if localPlayer.Character then
+            for _, tool in ipairs(localPlayer.Character:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local targetPart = tool:FindFirstChild("Hitbox") or tool:FindFirstChild("Handle")
+                    if targetPart then
+                        targetPart.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ)
+                        local box = targetPart:FindFirstChild("MMB_SelectionBox") or Instance.new("SelectionBox", targetPart)
+                        box.Name = "MMB_SelectionBox" box.Adornee = targetPart box.LineThickness = 0.05 box.Color3 = Color3.fromRGB(0, 255, 0)
+                    end
+                end
+            end
+        end
+    end
+})
+
+local SectionFeatures = Tabs.PvP:AddSection("Chức Năng Hỗ Trợ Chiến Đấu")
+local autoToolState = false
+SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh (Cầm Tool)", Default = false, Callback = function(state) autoToolState = state end })
+task.spawn(function()
+    while true do
+        task.wait(0.01)
+        if autoToolState and localPlayer.Character then
+            local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then pcall(function() tool:Activate() end) end
+        end
+    end
+end)
+
+_G.HitboxPvP = false SectionFeatures:AddToggle("HitboxRed", { Title = "Mở Rộng Hitbox Địch (Hộp Đỏ MMB)", Default = false, Callback = function(state) _G.HitboxPvP = state end })
+
+_G.SpeedPvP = false 
+SectionFeatures:AddToggle("BypassSpeed", { Title = "Bypass Speed Velocity (Anti-Kick)", Default = false, Callback = function(state) _G.SpeedPvP = state end })
+SectionFeatures:AddSlider("VelocitySpeedSlider", { Title = "Tốc độ Velocity", Min = 20, Max = 120, Default = 65, Rounding = 1, Callback = function(val) getgenv().BypassVelocitySpeed = val end })
+
+_G.AutoHeal = false SectionFeatures:AddToggle("AutoHeal", { Title = "Tự Động Băng Gạc (Hồi Ngầm - Giữ Vũ Khí)", Default = false, Callback = function(state) _G.AutoHeal = state end })
+
+task.spawn(function()
+    while true do
+        task.wait(0.18)
+        if _G.AutoHeal and localPlayer.Character then
+            local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 and (humanoid.Health / humanoid.MaxHealth) * 100 <= NGUONG_MAU_YEU then
+                pcall(function()
+                    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                            local n = obj.Name:lower()
+                            if n:match("heal") or n:match("gac") or n:match("bang") or n:match("band") or n:match("med") or n:match("use") or n:match("item") then
+                                if obj:IsA("RemoteEvent") then obj:FireServer("Băng Gạc") obj:FireServer() else obj:InvokeServer("Băng Gạc") obj:InvokeServer() end
+                            end
+                        end
+                    end
+                    local toolGac = localPlayer.Backpack:FindFirstChild("Băng Gạc") or localPlayer.Backpack:FindFirstChild("Bandage") or localPlayer.Backpack:FindFirstChild("Medkit")
+                    if toolGac then toolGac:Activate() end
+                end)
+            end
+        end
+    end
+end)
+
+local spinSpeed = 5 local spinConnection
+SectionFeatures:AddSlider("SpinSpeed", { Title = "Tốc độ Spin", Min = 1, Max = 1000, Default = 5, Rounding = 1, Callback = function(val) spinSpeed = val end })
+SectionFeatures:AddToggle("PvPSpin", {
+    Title = "PvP Spin", Default = false,
+    Callback = function(state)
+        if spinConnection then spinConnection:Disconnect() end
+        if state then
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = false end
+            spinConnection = RunService.Heartbeat:Connect(function() local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") if root then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0) end end)
+        else
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = true end
+        end
+    end
+})
+
+local SectionAim = Tabs.PvP:AddSection("Hệ Thống Khóa Mục Tiêu")
+_G.AimlockPvP = false SectionAim:AddToggle("AimlockMMB", { Title = "Aimlock Theo Bán Kính", Default = false, Callback = function(state) _G.AimlockPvP = state end })
+
+local aimPlayerState = false local currentTargetName = "None" local aimConnection
+local TargetButton = SectionAim:AddButton({
+    Title = "Chọn Mục Tiêu Chỉ Định", Description = "Mục tiêu hiện tại: None",
+    Callback = function()
+        local playerList = {}
+        for _, p in ipairs(Players:GetPlayers()) do if p ~= localPlayer then table.insert(playerList, p.Name) end end
+        if #playerList == 0 then Fluent:Notify({ Title = "Thông báo", Content = "Không tìm thấy ai!", Duration = 3 }) return end
+        local options = {}
+        for _, name in ipairs(playerList) do table.insert(options, { Text = name, Callback = function() currentTargetName = name TargetButton:SetDesc("Mục tiêu hiện tại: " .. name) end }) end
+        Window:Dialog({ Title = "Hệ thống Target", Content = "Chọn người chơi:", Buttons = options })
+    end
+})
+
+SectionAim:AddToggle("AimPlayerXenox", {
+    Title = "Khóa Tâm Nhìn (Target)", Default = false,
+    Callback = function(state)
+        aimPlayerState = state if aimConnection then aimConnection:Disconnect() end
+        if state then
+            aimConnection = RunService.RenderStepped:Connect(function()
+                if currentTargetName ~= "None" and localPlayer.Character then
+                    local target = Players:FindFirstChild(currentTargetName) local localRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if target and target.Character and target.Character:FindFirstChild("Head") and localRoot then
+                        local head = target.Character.Head localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(head.Position.X, localRoot.Position.Y, head.Position.Z))
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local function getClosestPlayer()
+    local closestPlayer = nil local shortestDistance = AIMLOCK_RADIUS
+    local localChar = localPlayer.Character local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+            if p.Character.Humanoid.Health > 0 then
+                local distance = (localRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then shortestDistance = distance closestPlayer = p end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function createPlayerESP(targetPlayer)
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local root = targetPlayer.Character.HumanoidRootPart
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NameESP_" .. targetPlayer.Name billboard.Size = UDim2.new(0, 150, 0, 35) billboard.Adornee = root billboard.AlwaysOnTop = true billboard.MaxDistance = 2000 billboard.Parent = folderESP
+    local label = Instance.new("TextLabel", billboard)
+    label.Size = UDim2.fromScale(1, 1) label.BackgroundTransparency = 0.5 label.BackgroundColor3 = Color3.new(0, 0, 0) label.Text = targetPlayer.Name label.TextColor3 = Color3.new(1, 0, 0) label.TextScaled = true label.Font = Enum.Font.SourceSansBold
+    local line = Drawing.new("Line") line.Visible = true line.Color = Color3.new(1, 0, 0) line.Thickness = 2
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not _G.ESPToggleState or not targetPlayer.Parent or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            line.Visible = false line:Delete() billboard:Destroy() connection:Disconnect() return
+        end
+        local cam = workspace.CurrentCamera
+        local targetPos, onScreen1 = cam:WorldToViewportPoint(root.Position)
+        local localPos, onScreen2 = cam:WorldToViewportPoint(localPlayer.Character.HumanoidRootPart.Position)
+        if onScreen1 and onScreen2 then line.From = Vector2.new(localPos.X, localPos.Y) line.To = Vector2.new(targetPos.X, targetPos.Y) line.Visible = true billboard.Enabled = true else line.Visible = false billboard.Enabled = false end
+    end)
+end
+
+local function applyHealthESP(character)
+    local head = character:FindFirstChild("Head") local hum = character:FindFirstChildOfClass("Humanoid")
+    if head and hum and not head:FindFirstChild("HealthESP") then
+        local billboard = Instance.new("BillboardGui", head) billboard.Name = "HealthESP" billboard.Size = UDim2.new(4, 0, 1.5, 0) billboard.StudsOffset = Vector3.new(0, 3, 0) billboard.AlwaysOnTop = true
+        local bgFrame = Instance.new("Frame", billboard) bgFrame.Size = UDim2.new(1, 0, 0.2, 0) bgFrame.Position = UDim2.new(0, 0, 0.5, 0) bgFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        local bar = Instance.new("Frame", bgFrame) bar.Name = "HealthBar" bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0) bar.Size = UDim2.new(1, 0, 1, 0)
+        local txt = Instance.new("TextLabel", billboard) txt.Name = "HPText" txt.Size = UDim2.new(1, 0, 0.5, 0) txt.Position = UDim2.new(0, 0, 0, -10) txt.BackgroundTransparency = 1 txt.TextColor3 = Color3.fromRGB(255, 255, 255) txt.Font = Enum.Font.SourceSansBold txt.TextScaled = true
+    end
+end
+
+local SectionESP = Tabs.PvP:AddSection("Hệ Thống Định Vị (ESP)")
+_G.ESPToggleState = false
+SectionESP:AddToggle("ESPLineName", { Title = "Hiển Thị ESP Line & Tên", Default = false, Callback = function(state) _G.ESPToggleState = state if not state then folderESP:ClearAllChildren() end end })
+task.spawn(function() while true do task.wait(2) if _G.ESPToggleState then for _, p in ipairs(Players:GetPlayers()) do if p ~= localPlayer and not folderESP:FindFirstChild("NameESP_" .. p.Name) then createPlayerESP(p) end end end end end)
+
+local toolHitboxESPState = false SectionESP:AddToggle("ToolHitboxESP", { Title = "Vòng Hitbox Vũ Khí Địch", Default = false, Callback = function(state) toolHitboxESPState = state if not state then for tool, box in pairs(toolBoxes) do if box and box.Parent then box:Destroy() end end toolBoxes = {} end end })
+local healthESPState = false SectionESP:AddToggle("HealthESP", { Title = "Thanh Máu Đối Thủ", Default = false, Callback = function(state) healthESPState = state if not state then for _, p in ipairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("HealthESP") then p.Character.Head.HealthESP:Destroy() end end end end })
+
+-- ============================================================================
+-- LOGIC VÀ INTERFACE TAB: FARM BOSS
+-- ============================================================================
+local SectionFarmCore = Tabs.FarmBoss:AddSection("Hệ Thống Auto Farm System")
+
+local function ScanForPlayers()
+    local rootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false, nil end
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= localPlayer and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance < BAN_KINH_SCAN_NGUOI then return true, otherPlayer.Name end
+        end
+    end
+    return false, nil
+end
+
+local function HopToLowestServer()
+    Fluent:Notify({ Title = "Hệ thống", Content = "Đang quét và tự động chuyển đổi Server an toàn...", Duration = 3 })
+    pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?limit=100")).data
+        for _, s in pairs(servers) do 
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then 
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, localPlayer) 
+                break 
+            end 
+        end
+    end)
+end
+
+local function GetBoss()
+    local b = workspace:FindFirstChild("Boss Zone") and workspace["Boss Zone"]:FindFirstChild("Boss")
+    return (b and b:FindFirstChild("Hitbox") and b:FindFirstChildOfClass("Humanoid").Health > 0) and b or nil
+end
+
+local function CleanupObstacles()
+    pcall(function()
+        local bossZone = workspace:FindFirstChild("Boss Zone")
+        if bossZone and bossZone:FindFirstChild("BOSSZONE") then
+            local folder = bossZone.BOSSZONE
+            local nui = folder:FindFirstChild("Núi") or folder:FindFirstChild("N\195\186i")
+            if nui then nui:Destroy() end
+            if folder:FindFirstChild("HieuUng") then folder.HieuUng:Destroy() end
+        end
+        if bossZone then
+            for _, d in pairs(bossZone:GetDescendants()) do if d:IsA("BasePart") and d.Name == "PartTangHinh" then d:Destroy() end end
+        end
+    end)
+end
+
+SectionFarmCore:AddToggle("AutoFarmSystemToggle", {
+    Title = "🤖 KÍCH HOẠTH AUTO FARM BOSS SYSTEM",
+    Default = false,
+    Callback = function(state)
+        isAutoFarmEnabled = state
+        if farmConnection then farmConnection:Disconnect() end
+        
+        if isAutoFarmEnabled then
+            Fluent:Notify({ Title = "Farm System", Content = "Đã khởi chạy Radar & Loop Farm!", Duration = 3 })
+            farmConnection = RunService.Heartbeat:Connect(function(dt)
+                local playerDetected, detectorName = ScanForPlayers()
+                if playerDetected then
+                    isAutoFarmEnabled = false
+                    if farmConnection then farmConnection:Disconnect() end
+                    Fluent:Notify({ Title = "CẢNH BÁO DETECT", Content = "Phát hiện người chơi ["..detectorName.."] tiến vào khu vực! Thực hiện Hop Server...", Duration = 5 })
+                    task.wait(0.5)
+                    HopToLowestServer()
+                    return
+                end
+
+                local boss = GetBoss()
+                local rootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if boss and savedCFrame and rootPart then
+                    tickXoay = tickXoay + dt
+                    local pos = boss.Hitbox.Position + Vector3.new(math.cos(tickXoay*3)*KHOANG_CACH_TIEP_CAN, 5, math.sin(tickXoay*3)*KHOANG_CACH_TIEP_CAN)
+                    rootPart.CFrame = CFrame.new(rootPart.Position:Lerp(pos, TOC_DO_BAY_FARM), boss.Hitbox.Position)
+                    if localPlayer.Character:FindFirstChildOfClass("Tool") then localPlayer.Character:FindFirstChildOfClass("Tool"):Activate() end
+                else
+                    if savedCFrame and rootPart then rootPart.CFrame = savedCFrame end
+                end
+            end)
+        else
+            Fluent:Notify({ Title = "Farm System", Content = "Đã tắt chuỗi tiến trình Auto Farm.", Duration = 3 })
+        end
+    end
+})
+
+SectionFarmCore:AddSlider("FarmTweenSpeedSlider", { Title = "⚡ Tốc độ bay Farm (Lerp Speed)", Min = 0.05, Max = 1.0, Default = 0.2, Rounding = 2, Callback = function(val) TOC_DO_BAY_FARM = val end })
+SectionFarmCore:AddSlider("FarmDistanceSlider", { Title = "📏 Khoảng cách tiếp cận Boss", Min = 5, Max = 50, Default = 20, Rounding = 1, Callback = function(val) KHOANG_CACH_TIEP_CAN = val end })
+
+local SectionFarmUtils = Tabs.FarmBoss:AddSection("Tiện Ích Vận Hành V8.22")
+SectionFarmUtils:AddButton({ Title = "✨ DỌN DẸP VẬT CẢN & HIỆU ỨNG", Callback = function() CleanupObstacles() Fluent:Notify({ Title = "Hệ thống", Content = "Đã dọn dẹp vật cản thành công!", Duration = 3 }) end })
+SectionFarmUtils:AddButton({ Title = "📌 LƯU VỊ TRÍ HIỆN TẠI (Để Farm)", Callback = function() local rootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") if rootPart then savedCFrame = rootPart.CFrame Fluent:Notify({ Title = "Hệ thống", Content = "Đã khóa vị trí đứng hiện tại!", Duration = 3 }) else Fluent:Notify({ Title = "Lỗi", Content = "Không tìm thấy HumanoidRootPart!", Duration = 3 }) end end })
+SectionFarmUtils:AddButton({ Title = "🗑️ XÓA VỊ TRÍ ĐÃ LƯU", Callback = function() savedCFrame = nil Fluent:Notify({ Title = "Hệ thống", Content = "Đã xóa vị trí nhớ.", Duration = 3 }) end })
+SectionFarmUtils:AddButton({ Title = "⚡ TỰ ĐỘNG ĐỔI SERVER (Server Hop)", Callback = function() HopToLowestServer() end })
+
+local SectionNameSpoofer = Tabs.FarmBoss:AddSection("Hệ Thống Thay Đổi Danh Tính")
+local function GetPlayerGuiNameLabel()
+    local success, result = pcall(function() return localPlayer.PlayerGui.PlayerGui.NameLabel end)
+    return success and result or nil
+end
+
+local function UpdateAllNames(targetName)
+    local guiLabel = GetPlayerGuiNameLabel()
+    if guiLabel then guiLabel.Text = targetName end
+    local char = localPlayer.Character
+    if char then
+        local hum = char:WaitForChild("Humanoid", 3)
+        if hum then hum.DisplayName = targetName end
+        for _, desc in pairs(char:GetDescendants()) do
+            if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
+                for _, child in pairs(desc:GetDescendants()) do
+                    if child:IsA("TextLabel") then
+                        if targetName == "" then desc.Enabled = false; child.Text = "" else desc.Enabled = true; child.Text = targetName end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local NameInputObj = SectionNameSpoofer:AddInput("SpoofNameInput", { Title = "Nhập tên muốn đổi", Default = "", Placeholder = "Nhập chuỗi tên mới...", Numeric = false, Finished = true, Callback = function(val) if val ~= "" then customNameStorage = val UpdateAllNames(customNameStorage) Fluent:Notify({ Title = "Identity Spoofer", Content = "Đã đổi tên: ["..customNameStorage.."]", Duration = 3 }) end end })
+SectionNameSpoofer:AddButton({ Title = "❌ XÓA TRẮNG TÊN (ẨN DANH)", Callback = function() customNameStorage = "" UpdateAllNames("") NameInputObj:SetValue("") Fluent:Notify({ Title = "Identity Spoofer", Content = "Đã ẩn danh tính thành công!", Duration = 3 }) end })
+
+localPlayer.CharacterAdded:Connect(function() task.wait(1.2) UpdateAllNames(customNameStorage) end)
+task.spawn(function() while task.wait(2) do local guiLabel = GetPlayerGuiNameLabel() if guiLabel and guiLabel.Text ~= customNameStorage and customNameStorage ~= "" then guiLabel.Text = customNameStorage end end end)
+
+-- ============================================================================
+-- LOGIC VÀ INTERFACE TAB: GÀ GẤU MATRIX AI HYBRID PRO
+-- ============================================================================
+local SectionAIHead = Tabs.GaGau:AddSection("Trạng Thái Phân Tích Lõi Matrix v43.7")
+
+local aiMsgParagraph = Tabs.GaGau:AddParagraph({ Title = "🤖 Em Guộc AI Reborn", Content = "Chào thằng lồn! Đang chờ khởi động luồng xung nhịp sòng..." })
+local predictionParagraph = Tabs.GaGau:AddParagraph({ Title = "🔮 Dự Đoán Hiện Tại", Content = "ĐANG PHÂN TÍCH CHU KỲ SÓNG..." })
+
+local SectionMetrics = Tabs.GaGau:AddSection("Thông Số Sòng Thực Tế")
+local scoreTracker = Tabs.GaGau:AddParagraph({ Title = "📊 Thống Kê Phiên Đột Xuất", Content = "🐥 Gà: 0 | 🐻 Gấu: 0\n📜 Lịch sử: [---]" })
+local pulseTracker = Tabs.GaGau:AddParagraph({ Title = "⏱️ Đồng Bộ Xung Hệ Thống", Content = "XUNG NHỊP GAME: Đang quét...\n💰 Số Dư: Đang quét...\n🏆 Thắng: 0/150 | Thua lt: 0" })
+
+local SectionConfigsGG = Tabs.GaGau:AddSection("Cấu Hình Thuật Toán Giao Dịch")
+
+local function execBet(side, amt)
+    if not autoGaGau then return end
+    task.spawn(function()
+        pcall(function()
+            local gaGauGui = localPlayer.PlayerGui:FindFirstChild("GaGauGui")
+            if not gaGauGui then return end
+            local frameGaGau = gaGauGui:FindFirstChild("FrameGaGau")
+            if not frameGaGau then return end
+
+            local targetBtn = (side == "Ga") and "ChonGa" or "ChonGau"
+            local targetInput = (side == "Ga") and "DienSoTienGa" or "DienSoTienGau"
+            local chon = frameGaGau:FindFirstChild(targetBtn)
+            local dienSoTien = frameGaGau:FindFirstChild(targetInput)
+            local xacNhan = frameGaGau:FindFirstChild("XacNhan")
+
+            if chon and dienSoTien and xacNhan then
+                for _, conn in pairs(getconnections(chon.MouseButton1Click)) do conn:Fire() end
+                task.wait(0.08)
+                dienSoTien.Text = tostring(math.floor(amt))
+                task.wait(0.08)
+                for _, conn in pairs(getconnections(xacNhan.MouseButton1Click)) do conn:Fire() end
+            end
+        end)
+    end)
+end
+
+local function deepAnalysis()
+    if #history < 3 then return "Ga", 50 end
+    
+    local scoreGa, scoreGau = 0, 0
+    local lastSide = history[#history]
+
+    -- TẦNG 1: CHU KỲ CHUẨN BÀI 1-1 (Gà -> Gấu -> Gà)
+    local l1, l2, l3 = history[#history], history[#history-1], history[#history-2]
+    -- Thứ tự thời gian từ cũ đến mới: l3 (Gà) -> l2 (Gấu) -> l1 (Gà)
+    if l3 == "Ga" and l2 == "Gau" and l1 == "Ga" then
+        scoreGau = scoreGau + 4.5
+        aiMsgParagraph:SetDesc("🤖 Em guộc AI: Phát hiện chuẩn chu kỳ GÀ - GẤU - GÀ! Theo nhịp đi thằng lồn!")
+    end
+
+    -- TẦNG 2: BẺ BỆT DÀI
+    local streak = 1
+    for i = #history - 1, 1, -1 do
+        if history[i] == lastSide then streak = streak + 1 else break end
+    end
+    if streak >= 3 then
+        local breakMultiplier = 1.0 + (streak * 1.5)
+        if lastSide == "Ga" then
+            scoreGau = scoreGau + breakMultiplier
+            aiMsgParagraph:SetDesc(string.format("🤖 Em guộc AI: Gà bệt %d cây rồi, sòng chuẩn bị hồi Gấu, lực bẻ đang tăng!", streak))
+        else
+            scoreGa = scoreGa + breakMultiplier
+            aiMsgParagraph:SetDesc(string.format("🤖 Em guộc AI: Gấu bệt dai quá (%d cây), em tính toán lực ép bẻ Gà cực căng!", streak))
+        end
+    end
+
+    -- TẦNG 3: MẬT ĐỘ DIỆN RỘNG
+    local cGa, cGau = 0, 0
+    local scanRange = math.min(25, #history)
+    for i = #history - scanRange + 1, #history do
+        if history[i] == "Ga" then cGa = cGa + 1 else cGau = cGau + 1 end
+    end
+    if cGa ~= cGau then
+        local densityBonus = math.abs(cGa - cGau) * 0.7
+        if cGa > cGau then scoreGau = scoreGau + densityBonus else scoreGa = scoreGa + densityBonus end
+    end
+
+    -- TẦNG 4 & 5: DỮ LIỆU VẾT KHỚP CHUỖI KHÉP KÍN
+    local m1, m2 = history[#history], history[#history-1]
+    local tGa, tGau = 0, 0
+    for i = 1, #history - 2 do
+        if history[i] == m2 and history[i+1] == m1 then
+            if history[i+2] == "Ga" then tGa = tGa + 1 else tGau = tGau + 1 end
+        end
+    end
+    if tGa + tGau > 0 then
+        if tGa > tGau then scoreGau = scoreGau + 1.2 else scoreGa = scoreGa + 1.2 end
+    end
+
+    local totalScore = scoreGa + scoreGau
+    if totalScore == 0 then return (lastSide == "Ga" and "Gau" or "Ga"), 50 end
+    
+    if scoreGa > scoreGau then
+        return "Ga", 50 + math.floor((scoreGa / totalScore) * 45)
+    else
+        return "Gau", 50 + math.floor((scoreGau / totalScore) * 45)
+    end
+end
+
+local function updateGaGauUI()
+    local ga, gau, emo = 0, 0, {}
+    for i = math.max(1, #history - 9), #history do
+        if history[i] == "Ga" then ga = ga + 1; table.insert(emo, "🐥") else gau = gau + 1; table.insert(emo, "🐻") end
+    end
+    
+    scoreTracker:SetDesc(string.format("🐥 Gà: %d | 🐻 Gấu: %d\n📜 Lịch sử mới: %s", ga, gau, #emo > 0 and table.concat(emo, " ") or "[---]"))
+    
+    local leader = localPlayer:FindFirstChild("leaderstats")
+    local vnd = leader and leader:FindFirstChild("VND")
+    local balance = vnd and vnd.Value or 0
+    
+    pulseTracker:SetDesc(string.format("💰 Số Dư Tài Khoản: %s VND\n🏆 Thắng: %d/%d | Thua liên tiếp: %d\n💵 Cược Hiện Tại: %s", 
+        string.format("%.0f", balance), wins, winTarget, loses, (betCur >= 1e6 and string.format("%.1fM", betCur / 1e6) or tostring(betCur))))
+end
+
+SectionConfigsGG:AddInput("BetBaseInput", { Title = "Tiền Cược Gốc (Base)", Default = tostring(betBase), Numeric = true, Callback = function(val) local v = tonumber(val) if v and v > 0 then betBase = v if not betPlaced and loses == 0 then betCur = v end updateGaGauUI() end end })
+SectionConfigsGG:AddInput("BetMultiInput", { Title = "Hệ Số Nhân (Khi Thua)", Default = tostring(betMulti), Numeric = true, Callback = function(val) local v = tonumber(val) if v and v >= 1 then betMulti = v end end })
+SectionConfigsGG:AddInput("ConfThresInput", { Title = "Độ Tự Tin Tối Thiểu (%)", Default = tostring(confThres), Numeric = true, Callback = function(val) local v = tonumber(val) if v and v > 0 then confThres = v end end })
+SectionConfigsGG:AddInput("WinTargetInput", { Title = "Chỉ Tiêu Số Trận Thắng", Default = tostring(winTarget), Numeric = true, Callback = function(val) local v = tonumber(val) if v > 0 then winTarget = v updateGaGauUI() end end })
+
+local toggleGG = SectionConfigsGG:AddToggle("ToggleAutoGaGau", {
+    Title = "▶ KÍCH HOẠT AUTO GÀ GẤU MATRIX AI",
+    Default = false,
+    Callback = function(state)
+        if wins >= winTarget then 
+            Fluent:Notify({ Title = "Matrix System", Content = "Đã hoàn thành chỉ tiêu từ trước!", Duration = 3 })
+            return 
+        end
+        autoGaGau = state
+        if autoGaGau then
+            frozen = false; betPlaced = false
+            aiMsgParagraph:SetDesc("🤖 Em guộc AI: Đã bật luồng kiểm soát AI Pro v43.7!")
+        else
+            aiMsgParagraph:SetDesc("🤖 Em guộc AI: Đang tạm dừng luồng cược.")
+        end
+    end
+})
+
+-- REALTIME NETWORK SYNC GA GAU
+task.spawn(function()
+    local remote = ReplicatedStorage:WaitForChild("Remote", 10)
+    if not remote then return end
+    local upd = remote:WaitForChild("GaGauUpdate", 10)
+    if not upd then return end
+
+    upd.OnClientEvent:Connect(function(act, ...)
+        local args = { ... }
+        if act == "Countdown" then
+            local sec = args[1]
+            updateGaGauUI()
+            
+            if sec == 25 and autoGaGau and not betPlaced and not frozen then
+                local side, conf = deepAnalysis()
+                if conf >= confThres then
+                    lastPred = side
+                    betPlaced = true
+                    predictionParagraph:SetDesc(string.format("🔮 CHỌN: %s | 📊 ĐỘ TỰ TIN: %d%%", side == "Ga" and "🐥 GÀ" or "🐻 GẤU", conf))
+                    execBet(side, betCur)
+                else
+                    predictionParagraph:SetDesc(string.format("🔮 BỎ QUA PHIÊN NÀY (%d%% < %d%%)", conf, confThres))
+                end
+            end
+        elseif act == "Result" then
+            local winner = args[1]
+            if not winner then return end
+            local clean = (string.lower(winner) == "gau") and "Gau" or "Ga"
+
+            if lastPred ~= "" and betPlaced then
+                if lastPred == clean then
+                    wins = wins + 1
+                    loses = 0
+                    betCur = betBase
+                    frozen = false
+                    aiMsgParagraph:SetDesc("🤖 Em guộc AI: Địt mẹ game tuổi con cặc ngon ko em.")
+                else
+                    loses = loses + 1
+                    if loses >= loseMax then
+                        frozen = true
+                        betCur = betBase
+                        aiMsgParagraph:SetDesc("🤖 Em guộc AI: Cái lồn mẹ nó game như cặc! Chạm giới hạn lỗ!")
+                    else
+                        betCur = betCur * betMulti
+                        aiMsgParagraph:SetDesc("🤖 Em guộc AI: Cầu gãy rồi thằng ngu để bố tính!")
+                    end
+                end
+            end
+
+            table.insert(history, clean)
+            if #history > 35 then table.remove(history, 1) end
+            updateGaGauUI()
+
+            lastPred = ""
+            betPlaced = false
+            
+            if wins >= winTarget then
+                autoGaGau = false
+                toggleGG:SetValue(false)
+                aiMsgParagraph:SetDesc("🤖 Em guộc AI: Nghỉ đi thằng lồn địt mẹ tham thì thua! Đủ chỉ tiêu!")
+                predictionParagraph:SetDesc("🏆 HOÀN THÀNH CHỈ TIÊU!")
+            end
+        elseif act == "SyncState" then
+            local data = args[1] or {}
+            if data.history then
+                table.clear(history)
+                for _, v in ipairs(data.history) do
+                    table.insert(history, (string.lower(tostring(v)) == "gau") and "Gau" or "Ga")
+                end
+                while #history > 35 do table.remove(history, 1) end
+                updateGaGauUI()
+            end
+        end
+    end)
+    upd:FireServer("RequestSync")
+end)
+
+-- ============================================================================
+-- HEARTBEAT MAIN LOOP & CORE LOGIC COMBAT ESP
+-- ============================================================================
+RunService.Heartbeat:Connect(function()
+    local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChild("Humanoid")
+    if not char or not root or not hum then return end
+    
+    if _G.SpeedPvP then
+        if hum.MoveDirection.Magnitude > 0 then
+            local targetVelocity = hum.MoveDirection * getgenv().BypassVelocitySpeed
+            root.AssemblyLinearVelocity = Vector3.new(targetVelocity.X, root.AssemblyLinearVelocity.Y, targetVelocity.Z)
+        else
+            root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+        end
+    end
+    
+    if _G.AimlockPvP and not aimPlayerState then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+        end
+    end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Character then
+            local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                if _G.HitboxPvP then
+                    targetRoot.Size = HITBOX_SIZE_RED targetRoot.Transparency = 0.75 targetRoot.Color = Color3.fromRGB(244, 63, 94) targetRoot.CanCollide = true
+                else
+                    if targetRoot.Size == HITBOX_SIZE_RED then targetRoot.Size = Vector3.new(2, 2, 1) targetRoot.Transparency = 1 targetRoot.CanCollide = true end
+                end
+            end
+            if toolHitboxESPState then
+                for _, child in ipairs(p.Character:GetChildren()) do
+                    if child:IsA("Tool") then
+                        local handle = child:FindFirstChild("Handle") or child:FindFirstChild("Hitbox")
+                        if handle and not toolBoxes[child] then
+                            local sBox = Instance.new("SelectionBox", handle)
+                            sBox.Name = "GlobalToolHitbox" sBox.Adornee = handle sBox.LineThickness = 0.04 sBox.Color3 = Color3.fromRGB(0, 255, 0) sBox.SurfaceTransparency = 0.9
+                            toolBoxes[child] = sBox
+                        end
+                    end
+                end
+            end
+            if healthESPState then
+                applyHealthESP(p.Character)
+                local tHum = p.Character:FindFirstChildOfClass("Humanoid") local tHead = p.Character:FindFirstChild("Head")
+                if tHum and tHead and tHead:FindFirstChild("HealthESP") then
+                    local esp = tHead.HealthESP local bar = esp.bgFrame.HealthBar local percentage = math.clamp(tHum.Health / tHum.MaxHealth, 0, 1)
+                    bar.Size = UDim2.new(percentage, 0, 1, 0)
+                    bar.BackgroundColor3 = percentage > 0.6 and Color3.fromRGB(0, 255, 0) or (percentage > 0.3 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0))
+                    esp.HPText.Text = math.floor(tHum.Health) .. "/" .. math.floor(tHum.MaxHealth)
+                end
+            end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character then for _, child in ipairs(p.Character:GetChildren()) do if toolBoxes[child] then toolBoxes[child]:Destroy() toolBoxes[child] = nil end end end
+end)
+
+-- ============================================================================
+-- ANTI-AFK PROTECTION ENGINE
+-- ============================================================================
+localPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+    Fluent:Notify({ Title = "Anti-AFK System", Content = "Đã thực hiện giữ kết nối chống Kick AFK!", Duration = 3 })
+end)
+
+task.spawn(function()
+    while task.wait(300) do
+        if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+            localPlayer.Character.Humanoid.JumpPower = 50
+            localPlayer.Character.Humanoid.Jump = true
+        end
+    end
+end)
+
+-- HOÀN THÀNH KHỞI CHẠY GIAO DIỆN
+Window:SelectTab(1)
+Fluent:Notify({ Title = "MEMAYBEO HUB V28.2", Content = "Đã cập nhật thuật toán chu kỳ Gà-Gấu-Gà chuẩn chỉ!", Duration = 5 })
