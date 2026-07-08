@@ -1,5 +1,5 @@
 -- ============================================================================
--- ⚔️ MEMAYBEO HUB - VERSION V28.1 (REMASTERED CHEST BYPASS ENGINE)
+-- ⚔️ MEMAYBEO HUB - VERSION V28.2 (INTEGRATED SMART DESYNC ENGINE)
 -- ============================================================================
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -35,8 +35,8 @@ folderESP.Name = "ESP"
 
 -- KHỞI TẠO MENU
 local Window = Fluent:CreateWindow({
-    Title = "MEMAYBEO HUB V28.1",
-    SubTitle = "Fixed Chest Update & Safe Velocity Engine",
+    Title = "MEMAYBEO HUB V28.2",
+    SubTitle = "Fixed Chest & Smart Desync PvP Integrated",
     TabWidth = 140,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false, 
@@ -287,9 +287,6 @@ local function findValidChestOnly()
     return nil
 end
 
--- ============================================================================
--- [MỚI]: VÒNG LẶP LOOT RƯƠNG BYPASS ANTI-CHEAT (KHÔNG DÙNG CFRAME TRỰC TIẾP)
--- ============================================================================
 task.spawn(function()
     while true do
         task.wait(0.01)
@@ -303,18 +300,13 @@ task.spawn(function()
                 if chest and root and hum then
                     local targetPivot = chest:GetPivot()
                     local chestPos = targetPivot.Position
-                    
-                    -- Cách cũ: CFrame thẳng mặt rương gây dính bẫy chết
-                    -- Cách mới: Lướt Velocity giữ khoảng cách an toàn 5.5 studs phía trên rương
                     local safeSkyPos = Vector3.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
                     
-                    -- Nếu khoảng cách xa, dùng Tween chuyển tiếp nhẹ lên bầu trời trước khi hạ cánh
                     if (root.Position - safeSkyPos).Magnitude > 15 then
                         root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 45, chestPos.Z)
                         task.wait(0.1)
                     end
                     
-                    -- Khóa vị trí lơ lửng an toàn bằng Velocity triệt tiêu trọng lực
                     root.CFrame = CFrame.new(safeSkyPos, chestPos)
                     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                     
@@ -324,13 +316,13 @@ task.spawn(function()
                     end
                     
                     if prompt then 
-                        prompt.MaxActivationDistance = 200 -- Tăng tầm kích hoạt nhận diện từ trên cao
+                        prompt.MaxActivationDistance = 200
                         prompt.RequiresLineOfSight = false 
                         
                         local grabCount = 0
                         repeat
                             fireproximityprompt(prompt)
-                            task.wait(0.25) -- Tăng độ trễ (delay) tránh spam gói tin khiến hệ thống nghi ngờ
+                            task.wait(0.25)
                             
                             if root and _G.AutoLoot then
                                 root.CFrame = CFrame.new(safeSkyPos, chestPos)
@@ -346,8 +338,69 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- INTERFACE TAB PVP
+-- INTERFACE TAB PVP (TÍCH HỢP TÀNG HÌNH SMART DESYNC)
 -- ============================================================================
+
+-- ====== [MỚI]: THÊM SECTION SMART DESYNC VÀO TAB PVP ======
+local SectionDesync = Tabs.PvP:AddSection("Chức Năng Tàng Hình (Smart Desync)")
+_G.SmartDesyncState = false
+getgenv().DesyncDepth = -35
+
+SectionDesync:AddToggle("SmartDesyncToggle", {
+    Title = "Mở Tàng Hình Desync (Chống Mất Map)",
+    Default = false,
+    Callback = function(state)
+        _G.SmartDesyncState = state
+        if not state and localPlayer.Character then
+            local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+            local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hum then hum.CameraOffset = Vector3.new(0, 0, 0) end
+            if root then root.AssemblyLinearVelocity = Vector3.zero end
+        end
+    end
+})
+
+SectionDesync:AddSlider("DesyncDepthSlider", {
+    Title = "Độ Sâu Desync (Khoảng Cách Dìm)",
+    Min = -100,
+    Max = -10,
+    Default = -35,
+    Rounding = 1,
+    Callback = function(val)
+        getgenv().DesyncDepth = val
+    end
+})
+
+-- VÒNG LẶP SMART DESYNC CHẠY NỀN VĨNH CỬU
+task.spawn(function()
+    while true do
+        RunService.Heartbeat:Wait()
+        if _G.SmartDesyncState and localPlayer.Character then
+            pcall(function()
+                local char = localPlayer.Character
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                
+                if root and hum and hum.Health > 0 then
+                    local realCF = root.CFrame
+                    root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+                    
+                    local desyncCF = realCF * CFrame.new(0, getgenv().DesyncDepth, 0)
+                    root.CFrame = desyncCF
+                    hum.CameraOffset = desyncCF:ToObjectSpace(CFrame.new(realCF.Position)).Position
+
+                    RunService.RenderStepped:Wait()
+
+                    if root and _G.SmartDesyncState then
+                        root.CFrame = realCF
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ====== CÁC CHỨC NĂNG PVP KHÁC ======
 local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox")
 SectionHitbox:AddInput("BoxX", { Title = "Hit Box Size X", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 5 end })
 SectionHitbox:AddInput("BoxY", { Title = "Hit Box Size Y", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 5 end })
@@ -577,4 +630,4 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 Window:SelectTab(1)
-Fluent:Notify({ Title = "MEMAYBEO HUB V28.1", Content = "Đã sửa lỗi Auto Loot Chest tránh bẫy tự tử từ Game Update!", Duration = 5 })
+Fluent:Notify({ Title = "MEMAYBEO HUB V28.2", Content = "Đã tích hợp Smart Desync Tàng Hình vào Tab PvP!", Duration = 5 })
