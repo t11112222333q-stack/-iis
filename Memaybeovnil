@@ -1,5 +1,5 @@
 -- ============================================================================
--- ⚔️ MEMAYBEO HUB - VERSION V31.5 (CUSTOM FAR DESYNC FACE-UP)
+-- ⚔️ MEMAYBEO HUB - VERSION V31.5 (FULL INTEGRATED + FIX LAG + AUTO HIDE)
 -- ============================================================================
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -9,6 +9,10 @@ local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
@@ -45,45 +49,248 @@ local Window = Fluent:CreateWindow({
 
 local Tabs = {
     Farm = Window:AddTab({ Title = "Farm", Icon = "rbxassetid://4483345998" }),
-    PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" })
+    PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" }),
+    Server = Window:AddTab({ Title = "Server", Icon = "rbxassetid://4483345998" }),
+    FixLag = Window:AddTab({ Title = "Fix Lag", Icon = "rbxassetid://4483345998" })
 }
 
--- NÚT ẨN HIỆN MENU (MOBILE TOGGLE)
-if playerGui:FindFirstChild("FluentMobileToggle") then
-    playerGui.FluentMobileToggle:Destroy()
-end
+-- ============================================================================
+-- 📲 LOGIC CẢM ỨNG: TỰ ĐỘNG ẨN KHI VÀO GAME & NHẤN 3 NGÓN TAY 3 LẦN ĐỂ BẬT/TẮT
+-- ============================================================================
+local menuVisible = false -- Mặc định ẩn menu ngay từ đầu
+local tripleFingerTapCount = 0
+local lastTapTime = 0
+local activeTouches = {}
 
-local screenGui = Instance.new("ScreenGui", playerGui)
-screenGui.Name = "FluentMobileToggle"
-screenGui.ResetOnSpawn = false
-
-local toggleBtn = Instance.new("ImageButton", screenGui)
-toggleBtn.Size = UDim2.fromOffset(50, 50)
-toggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-toggleBtn.Image = "rbxassetid://4483345998"
-toggleBtn.Active = true
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-
-local btnStroke = Instance.new("UIStroke", toggleBtn)
-btnStroke.Color = Color3.fromRGB(225, 29, 72)
-btnStroke.Thickness = 1.5
-
-local dragging, dragInput, dragStart, startPos
-toggleBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true dragStart = input.Position startPos = toggleBtn.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+-- Thực hiện ẩn Menu ngay lập tức sau khi load
+task.spawn(function()
+    task.wait(0.1)
+    if Window.Minimize then
+        Window:Minimize(true)
     end
 end)
-toggleBtn.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end end)
-UIS.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
-local menuVisible = true
-toggleBtn.MouseButton1Click:Connect(function()
-    menuVisible = not menuVisible
-    if Window.Minimize then Window:Minimize(not menuVisible) end
+UIS.TouchStarted:Connect(function(touch, gameProcessed)
+    activeTouches[touch] = true
+    
+    -- Đếm số ngón tay đang chạm màn hình
+    local currentTouchCount = 0
+    for _ in pairs(activeTouches) do
+        currentTouchCount = currentTouchCount + 1
+    end
+    
+    -- Nếu chạm chính xác bằng 3 ngón tay
+    if currentTouchCount == 3 then
+        local currentTime = tick()
+        if currentTime - lastTapTime < 0.6 then
+            tripleFingerTapCount = tripleFingerTapCount + 1
+        else
+            tripleFingerTapCount = 1
+        end
+        lastTapTime = currentTime
+        
+        -- Khi đã đủ 3 lần bấm (mỗi lần bằng 3 ngón)
+        if tripleFingerTapCount >= 3 then
+            tripleFingerTapCount = 0
+            menuVisible = not menuVisible
+            if Window.Minimize then 
+                Window:Minimize(not menuVisible) 
+            end
+            Fluent:Notify({ 
+                Title = "Menu Toggle", 
+                Content = menuVisible and "Đã hiện Menu!" or "Đã ẩn Menu!", 
+                Duration = 2 
+            })
+        end
+    end
 end)
+
+UIS.TouchEnded:Connect(function(touch)
+    activeTouches[touch] = nil
+end)
+
+-- ============================================================================
+-- ⚡ LOGIC XỬ LÝ FIX LAG (FPS BOOST & REDUCE PARTS)
+-- ============================================================================
+local hiddenPartsBackup = {}
+
+local function toggleFPSBoost(state)
+    if state then
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            end
+        end
+    else
+        Lighting.GlobalShadows = true
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+    end
+end
+
+local function reduceParts(percent, state)
+    if state then
+        local allParts = {}
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and not part:IsDescendantOf(localPlayer.Character) and not part.Parent:FindFirstChildOfClass("Humanoid") then
+                table.insert(allParts, part)
+            end
+        end
+        
+        local countToHide = math.floor(#allParts * (percent / 100))
+        for i = 1, countToHide do
+            local p = allParts[i]
+            if p and p.Parent then
+                hiddenPartsBackup[p] = p.LocalTransparencyModifier
+                p.LocalTransparencyModifier = 1
+            end
+        end
+    else
+        for part, oldTrans in pairs(hiddenPartsBackup) do
+            if part and part.Parent then
+                part.LocalTransparencyModifier = oldTrans
+            end
+        end
+        hiddenPartsBackup = {}
+    end
+end
+
+local function clearEverything()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+            obj:Destroy()
+        end
+    end
+    Lighting:ClearAllChildren()
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Fluent:Notify({ Title = "Fix Lag", Content = "Đã dọn dẹp sạch sẽ hiệu ứng & đồ họa!", Duration = 3 })
+end
+
+-- ============================================================================
+-- 🚀 CÀI ĐẶT TAB FIX LAG
+-- ============================================================================
+local SectionFixLag = Tabs.FixLag:AddSection("Tối Ưu Hoá Đồ Hoạ (Fix Lag)")
+
+SectionFixLag:AddToggle("FPSBoost", {
+    Title = "FPS Boost",
+    Default = false,
+    Callback = function(val)
+        _G.FPSBoostState = val
+        toggleFPSBoost(val)
+    end
+})
+
+SectionFixLag:AddToggle("Reduce20Parts", {
+    Title = "Reduce 20% Parts",
+    Default = false,
+    Callback = function(val)
+        _G.Reduce20State = val
+        reduceParts(20, val)
+    end
+})
+
+SectionFixLag:AddToggle("Reduce40Parts", {
+    Title = "Reduce 40% Parts",
+    Default = false,
+    Callback = function(val)
+        _G.Reduce40State = val
+        reduceParts(40, val)
+    end
+})
+
+SectionFixLag:AddToggle("Reduce60Parts", {
+    Title = "Reduce 60% Parts",
+    Default = false,
+    Callback = function(val)
+        _G.Reduce60State = val
+        reduceParts(60, val)
+    end
+})
+
+SectionFixLag:AddToggle("Reduce100Parts", {
+    Title = "Reduce 100% Parts",
+    Default = false,
+    Callback = function(val)
+        _G.Reduce100State = val
+        reduceParts(100, val)
+    end
+})
+
+SectionFixLag:AddToggle("ClearEverything", {
+    Title = "Clear Everything",
+    Description = "Xóa decal, particle, giảm đồ họa tối đa",
+    Default = false,
+    Callback = function(val)
+        if val then
+            clearEverything()
+        end
+    end
+})
+
+-- ============================================================================
+-- 🌐 CHỨC NĂNG SERVER HOP (TAB SERVER)
+-- ============================================================================
+local SectionServer = Tabs.Server:AddSection("Quản Lý Máy Chủ (Server Hop)")
+
+local function HopServer(targetType)
+    Fluent:Notify({ Title = "Server Hop", Content = "Đang quét danh sách máy chủ...", Duration = 3 })
+    
+    local placeId = game.PlaceId
+    local currentJobId = game.JobId
+    local cursor = ""
+    local candidateServer = nil
+    local bestCount = (targetType == "Fullest") and -1 or 999
+    
+    pcall(function()
+        repeat
+            local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/0?sortOrder=Desc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
+            local req = request or http_request or (syn and syn.request) or (http and http.request)
+            
+            if not req then
+                Fluent:Notify({ Title = "Lỗi", Content = "Executor không hỗ trợ HTTP Request!", Duration = 3 })
+                return
+            end
+            
+            local res = req({ Url = url, Method = "GET" })
+            local body = HttpService:JSONDecode(res.Body)
+            
+            if body and body.data then
+                for _, s in ipairs(body.data) do
+                    if s.id ~= currentJobId and s.playing < s.maxPlayers and s.playing > 0 then
+                        if targetType == "Fullest" then
+                            if s.playing > bestCount and s.playing < s.maxPlayers then
+                                bestCount = s.playing
+                                candidateServer = s.id
+                            end
+                        elseif targetType == "Lowest" then
+                            if s.playing < bestCount then
+                                bestCount = s.playing
+                                candidateServer = s.id
+                            end
+                        end
+                    end
+                end
+            end
+            cursor = body and body.nextPageCursor or nil
+        until not cursor or candidateServer ~= nil
+    end)
+
+    if candidateServer then
+        Fluent:Notify({ Title = "Đang Chuyển Server", Content = "Đã tìm thấy server (" .. tostring(bestCount) .. " người). Đang kết nối...", Duration = 4 })
+        TeleportService:TeleportToPlaceInstance(placeId, candidateServer, localPlayer)
+    else
+        Fluent:Notify({ Title = "Thất Bại", Content = "Không tìm thấy server phù hợp! Vui lòng thử lại.", Duration = 4 })
+    end
+end
+
+SectionServer:AddButton({ Title = "Chuyển Tới Server Đông Nhất (Còn Chỗ)", Callback = function() HopServer("Fullest") end })
+SectionServer:AddButton({ Title = "Chuyển Tới Server Ít Người Nhất", Callback = function() HopServer("Lowest") end })
+SectionServer:AddButton({ Title = "Rejoin (Vào Lại Server Hiện Tại)", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer) end })
 
 -- ============================================================================
 -- ✈️ TWEEN ENGINE DYNAMIC
@@ -151,7 +358,7 @@ SectionDelivery:AddSlider("TweenSpeedGrab", { Title = "Tốc độ di chuyển G
 
 local SectionChest = Tabs.Farm:AddSection("Auto Loot Chest")
 _G.AutoLoot = false
-SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương Toàn Bản Đồ", Default = false, Callback = function(state) _G.AutoLoot = state end })
+SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương (Tele Lại Vị Trí Cũ)", Default = false, Callback = function(state) _G.AutoLoot = state end })
 
 RunService.Stepped:Connect(function()
     if (_G.AutoDeliveryRunning or _G.AutoLoot) and localPlayer.Character then
@@ -212,31 +419,72 @@ task.spawn(function()
     end
 end)
 
+-- LOGIC AUTO LOOT CHEST + TELE VỀ CŨ
 local function findValidChestOnly()
-    local jobGame = workspace:FindFirstChild("JobGame") local suKien = jobGame and jobGame:FindFirstChild("SuKien") local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
-    if dropLoot then for _, child in pairs(dropLoot:GetChildren()) do if (child:IsA("Model") or child:IsA("BasePart")) and not string.find(string.lower(child.Name), "drop") then return child end end end
+    local jobGame = workspace:FindFirstChild("JobGame") 
+    local suKien = jobGame and jobGame:FindFirstChild("SuKien") 
+    local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
+    if dropLoot then 
+        for _, child in pairs(dropLoot:GetChildren()) do 
+            if (child:IsA("Model") or child:IsA("BasePart")) and not string.find(string.lower(child.Name), "drop") then 
+                return child 
+            end 
+        end 
+    end
     return nil
 end
 
 task.spawn(function()
     while true do
-        task.wait(0.01)
+        task.wait(0.02)
         if _G.AutoLoot then
             pcall(function()
-                local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hum and hum.Health <= 1 then task.wait(1) return end
+                local char = localPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid") 
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                
+                if not root or not hum or hum.Health <= 1 then 
+                    task.wait(1) 
+                    return 
+                end
+
                 local chest = findValidChestOnly()
-                if chest and root and hum then
-                    local chestPos = chest:GetPivot().Position local safeSkyPos = Vector3.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
-                    if (root.Position - safeSkyPos).Magnitude > 15 then root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 45, chestPos.Z) task.wait(0.1) end
-                    root.CFrame = CFrame.new(safeSkyPos, chestPos) root.AssemblyLinearVelocity = Vector3.zero
-                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if chest and chest.Parent then
+                    local lastStandingCF = root.CFrame 
+                    local chestPos = chest:GetPivot().Position 
+                    
+                    local safePos = CFrame.new(chestPos.X, chestPos.Y + 6.5, chestPos.Z) * CFrame.Angles(math.rad(-90), 0, 0)
+                    
+                    if (root.Position - chestPos).Magnitude > 20 then 
+                        root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 35, chestPos.Z) 
+                        task.wait(0.15) 
+                    end
+                    
+                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) 
+                        or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        
                     if prompt then 
-                        prompt.MaxActivationDistance = 200 prompt.RequiresLineOfSight = false local grabCount = 0
-                        repeat fireproximityprompt(prompt) task.wait(0.25)
-                            if root and _G.AutoLoot then root.CFrame = CFrame.new(safeSkyPos, chestPos) root.AssemblyLinearVelocity = Vector3.zero end
+                        prompt.MaxActivationDistance = 250 
+                        prompt.RequiresLineOfSight = false 
+                        local grabCount = 0
+                        
+                        repeat
+                            if not _G.AutoLoot or not hum or hum.Health <= 1 or not chest.Parent then break end
+                            
+                            root.CFrame = safePos
+                            root.AssemblyLinearVelocity = Vector3.zero
+                            
+                            fireproximityprompt(prompt)
+                            task.wait(0.3) 
+                            
                             grabCount = grabCount + 1
-                        until not chest.Parent or not _G.AutoLoot or grabCount > 30
+                        until not chest.Parent or grabCount > 25
+                    end
+
+                    if hum and hum.Health > 1 and root and lastStandingCF then
+                        root.CFrame = lastStandingCF
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        task.wait(0.2)
                     end
                 end
             end)
@@ -245,12 +493,11 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- INTERFACE TAB PVP (FACE-UP DESYNC - MẶC ĐỊNH -4)
+-- INTERFACE TAB PVP
 -- ============================================================================
-
 local SectionDesync = Tabs.PvP:AddSection("Chức Năng Nằm Ngửa Tàng Hình (Face-Up Desync)")
 _G.SmartDesyncState = false
-getgenv().DesyncHeightOffset = -4 -- Mặc định cài đặt đã đổi thành -4
+getgenv().DesyncHeightOffset = -4 
 
 local lastSafePos = nil
 
@@ -269,7 +516,6 @@ SectionDesync:AddToggle("SmartDesyncToggle", {
     end
 })
 
--- KHOẢNG CHỈNH TỪ -100 ĐẾN 100, MẶC ĐỊNH -4
 SectionDesync:AddSlider("DesyncOffsetSlider", {
     Title = "Khoảng Cách Đẩy Xác (Khoảng Cách Trục Y)",
     Min = -100,
@@ -279,7 +525,6 @@ SectionDesync:AddSlider("DesyncOffsetSlider", {
     Callback = function(val) getgenv().DesyncHeightOffset = val end
 })
 
--- LOGIC LẬT NGỬA NHÂN VẬT QUAY MẶT LÊN TRỜI VỚI KHOẢNG CÁCH TÙY CHỈNH
 RunService.Heartbeat:Connect(function()
     if _G.SmartDesyncState and localPlayer.Character then
         pcall(function()
@@ -292,10 +537,8 @@ RunService.Heartbeat:Connect(function()
                 local realCF = root.CFrame
                 lastSafePos = realCF
 
-                -- Khóa gia tốc rơi tự do
                 root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
 
-                -- Tắt va chạm cho vũ khí
                 if tool then
                     for _, part in ipairs(tool:GetDescendants()) do
                         if part:IsA("BasePart") then
@@ -305,23 +548,58 @@ RunService.Heartbeat:Connect(function()
                     end
                 end
 
-                -- Tạo CFrame Lật Ngửa 90 Độ (Mặt hướng lên trời) + dịch vị trí theo khoảng cách cài đặt
                 local faceUpRotation = CFrame.Angles(math.rad(-90), 0, 0)
                 local fakeCF = (realCF * CFrame.new(0, getgenv().DesyncHeightOffset, 0)) * faceUpRotation
 
-                -- Gửi CFrame giả lập sang Server
                 root.CFrame = fakeCF
                 hum.CameraOffset = fakeCF:ToObjectSpace(realCF).Position
 
                 RunService.RenderStepped:Wait()
 
-                -- Trả lại CFrame thực tế ở Client
                 if root and _G.SmartDesyncState then
                     root.CFrame = realCF
                 end
             end
         end)
     end
+end)
+
+-- FAKE LAG SERVER
+local SectionFakeLag = Tabs.PvP:AddSection("Fake Lag Server (Chống Địch Đánh Trúng)")
+_G.SmoothFakeLag = false
+getgenv().LagPower = 0.35
+
+SectionFakeLag:AddToggle("SmoothLagToggle", {
+    Title = "Bật Fake Lag Server",
+    Default = false,
+    Callback = function(state) _G.SmoothFakeLag = state end
+})
+
+SectionFakeLag:AddSlider("LagPowerSlider", {
+    Title = "Mức Độ Giật Lag (Giây)",
+    Min = 0.1, Max = 0.8, Default = 0.35, Rounding = 2,
+    Callback = function(v) getgenv().LagPower = v end
+})
+
+task.spawn(function()
+    local lastFakeTick = tick()
+    RunService.Heartbeat:Connect(function()
+        if _G.SmoothFakeLag and localPlayer.Character then
+            local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                if tick() - lastFakeTick < getgenv().LagPower then
+                    pcall(function() sethiddenproperty(root, "NetworkIsSpawning", true) end)
+                else
+                    lastFakeTick = tick()
+                    pcall(function() sethiddenproperty(root, "NetworkIsSpawning", false) end)
+                end
+            end
+        else
+            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                pcall(function() sethiddenproperty(localPlayer.Character.HumanoidRootPart, "NetworkIsSpawning", false) end)
+            end
+        end
+    end)
 end)
 
 -- HITBOX VŨ KHÍ & AUTO ATTACK
@@ -559,4 +837,4 @@ end)
 Tabs.Farm:Select()
 
 task.wait(0.5)
-Fluent:Notify({ Title = "MEMAYBEO HUB V31.5", Content = "Đã chỉnh khoảng cách Desync mặc định thành -4!", Duration = 5 })
+Fluent:Notify({ Title = "MEMAYBEO HUB V31.5", Content = "Đã tự động ẩn menu. Chạm 3 ngón tay 3 lần liên tục để Mở!", Duration = 5 })
