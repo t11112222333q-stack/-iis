@@ -1,5 +1,5 @@
 -- ============================================================================
--- ⚔️ MEMAYBEO HUB - VERSION V28.2 (INTEGRATED SMART DESYNC ENGINE)
+-- ⚔️ MEMAYBEO HUB - VERSION V31.5 (CUSTOM FAR DESYNC FACE-UP)
 -- ============================================================================
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -16,9 +16,9 @@ local playerGui = localPlayer:WaitForChild("PlayerGui")
 getgenv().CHEST_SPEED_TWEEN = 75 
 getgenv().GRAB_SPEED_TWEEN = 60 
 
-getgenv().HitBoxX = 5
-getgenv().HitBoxY = 5
-getgenv().HitBoxZ = 5
+getgenv().HitBoxX = 8
+getgenv().HitBoxY = 8
+getgenv().HitBoxZ = 8
 
 local HITBOX_SIZE_RED = Vector3.new(15, 15, 15)
 local NGUONG_MAU_YEU = 95 
@@ -26,17 +26,16 @@ local AIMLOCK_RADIUS = 35
 local VNIL_VECTOR = Vector3.new(-240.144531, -143.0, -580.035645) 
 local HOSPITAL_POSITION = Vector3.new(150, -145, 200)
 
--- TỐC ĐỘ DI CHUYỂN PVP MỚI (DÙNG CHO VELOCITY CHỐNG KICK)
 getgenv().BypassVelocitySpeed = 65 
 
 local toolBoxes = {}
 local folderESP = workspace:FindFirstChild("ESP") or Instance.new("Folder", workspace)
 folderESP.Name = "ESP"
 
--- KHỞI TẠO MENU
+-- KHỞI TẠO MENU FLUENT
 local Window = Fluent:CreateWindow({
-    Title = "MEMAYBEO HUB V28.2",
-    SubTitle = "Fixed Chest & Smart Desync PvP Integrated",
+    Title = "MEMAYBEO HUB V31.5",
+    SubTitle = "Far Face-Up Lie Down Desync",
     TabWidth = 140,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false, 
@@ -44,12 +43,20 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.End
 })
 
--- ============================================================================
--- 📱 NÚT ẨN HIỆN CHÍNH CHỦ (MOBILE TOGGLE - FIXED CLOSE/OPEN)
--- ============================================================================
+local Tabs = {
+    Farm = Window:AddTab({ Title = "Farm", Icon = "rbxassetid://4483345998" }),
+    PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" })
+}
+
+-- NÚT ẨN HIỆN MENU (MOBILE TOGGLE)
+if playerGui:FindFirstChild("FluentMobileToggle") then
+    playerGui.FluentMobileToggle:Destroy()
+end
+
 local screenGui = Instance.new("ScreenGui", playerGui)
 screenGui.Name = "FluentMobileToggle"
 screenGui.ResetOnSpawn = false
+
 local toggleBtn = Instance.new("ImageButton", screenGui)
 toggleBtn.Size = UDim2.fromOffset(50, 50)
 toggleBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
@@ -57,6 +64,7 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 toggleBtn.Image = "rbxassetid://4483345998"
 toggleBtn.Active = true
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+
 local btnStroke = Instance.new("UIStroke", toggleBtn)
 btnStroke.Color = Color3.fromRGB(225, 29, 72)
 btnStroke.Thickness = 1.5
@@ -71,18 +79,11 @@ end)
 toggleBtn.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then dragInput = input end end)
 UIS.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
+local menuVisible = true
 toggleBtn.MouseButton1Click:Connect(function()
-    if Window.Minimized then
-        Window:Minimize(false)
-    else
-        Window:Minimize(true)
-    end
+    menuVisible = not menuVisible
+    if Window.Minimize then Window:Minimize(not menuVisible) end
 end)
-
-local Tabs = {
-    Farm = Window:AddTab({ Title = "Farm", Icon = "rbxassetid://4483345998" }),
-    PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" })
-}
 
 -- ============================================================================
 -- ✈️ TWEEN ENGINE DYNAMIC
@@ -94,9 +95,7 @@ local function bypassTweenEngine(targetPos, speed, checkGlobalVariable, ignoreHe
     if not root or not hum or hum.Health <= 1 then return end
 
     local finalTargetPos = targetPos
-    if not ignoreHeight then
-        finalTargetPos = Vector3.new(targetPos.X, -137.5, targetPos.Z)
-    end
+    if not ignoreHeight then finalTargetPos = Vector3.new(targetPos.X, -137.5, targetPos.Z) end
 
     local distance = (root.Position - finalTargetPos).Magnitude
     if distance < 1.5 then return end 
@@ -106,40 +105,25 @@ local function bypassTweenEngine(targetPos, speed, checkGlobalVariable, ignoreHe
     local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(finalTargetPos)})
     
     tween:Play()
-
     local lastPos = root.Position
     local stuckTicks = 0
 
     while tween.PlaybackState == Enum.PlaybackState.Playing and _G[checkGlobalVariable] do
-        if hum.Health <= 1 then
-            tween:Cancel()
-            break
-        end
-
+        if hum.Health <= 1 then tween:Cancel() break end
         if (root.Position - lastPos).Magnitude < 0.2 then
             stuckTicks = stuckTicks + 1
             if stuckTicks > 40 then 
-                if ignoreHeight then
-                    root.CFrame = root.CFrame * CFrame.new(0, 2, -2)
-                else
-                    root.CFrame = root.CFrame * CFrame.new(0, 4, -5) 
-                end
+                root.CFrame = ignoreHeight and (root.CFrame * CFrame.new(0, 2, -2)) or (root.CFrame * CFrame.new(0, 4, -5))
                 stuckTicks = 0
             end
-        else
-            stuckTicks = 0
-        end
+        else stuckTicks = 0 end
         lastPos = root.Position
-
-        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-        root.AssemblyAngularVelocity = Vector3.new(0,0,0)
+        root.AssemblyLinearVelocity = Vector3.zero
         RunService.Heartbeat:Wait()
     end
 end
 
--- ============================================================================
--- 🏹 REALTIME ARROW FILTER
--- ============================================================================
+-- REALTIME ARROW FILTER
 local function getActiveDeliveryArrow()
     local delieveryFolder = workspace:FindFirstChild("JobGame") and workspace.JobGame:FindFirstChild("Delievery")
     local arrowSpawn = delieveryFolder and delieveryFolder:FindFirstChild("ArrowSpawn")
@@ -148,30 +132,21 @@ local function getActiveDeliveryArrow()
     for _, folder in pairs(arrowSpawn:GetChildren()) do
         if string.find(folder.Name, localPlayer.Name) or string.find(folder.Name, "Grab") then
             local arrow = folder:FindFirstChild("Arrow") or folder:FindFirstChildWhichIsA("BasePart", true)
-            if arrow then
-                if (arrow.Position - HOSPITAL_POSITION).Magnitude > 90 then 
-                    return arrow 
-                end
-            end
+            if arrow and (arrow.Position - HOSPITAL_POSITION).Magnitude > 90 then return arrow end
         end
     end
-
     for _, desc in pairs(arrowSpawn:GetDescendants()) do
         if (desc.Name == "Arrow" or desc:IsA("MeshPart") or desc:IsA("BasePart")) and desc.Transparency < 0.9 then
-            if (desc.Position - HOSPITAL_POSITION).Magnitude > 90 then
-                return desc
-            end
+            if (desc.Position - HOSPITAL_POSITION).Magnitude > 90 then return desc end
         end
     end
     return nil
 end
 
--- ============================================================================
 -- INTERFACE TAB FARM
--- ============================================================================
 local SectionDelivery = Tabs.Farm:AddSection("Auto Job Delivery (Fly Mode)")
 _G.AutoDeliveryRunning = false
-SectionDelivery:AddToggle("RunDelivery", { Title = "Bật Giao Hàng V28", Default = false, Callback = function(state) _G.AutoDeliveryRunning = state end })
+SectionDelivery:AddToggle("RunDelivery", { Title = "Bật Giao Hàng V31.5", Default = false, Callback = function(state) _G.AutoDeliveryRunning = state end })
 SectionDelivery:AddSlider("TweenSpeedGrab", { Title = "Tốc độ di chuyển Grab", Min = 20, Max = 150, Default = 60, Rounding = 1, Callback = function(v) getgenv().GRAB_SPEED_TWEEN = v end })
 
 local SectionChest = Tabs.Farm:AddSection("Auto Loot Chest")
@@ -181,83 +156,50 @@ SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương Toà
 RunService.Stepped:Connect(function()
     if (_G.AutoDeliveryRunning or _G.AutoLoot) and localPlayer.Character then
         local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum and hum:GetState() ~= Enum.HumanoidStateType.Running then 
-            hum:ChangeState(Enum.HumanoidStateType.Running) 
-        end
+        if hum and hum:GetState() ~= Enum.HumanoidStateType.Running then hum:ChangeState(Enum.HumanoidStateType.Running) end
         for _, part in pairs(localPlayer.Character:GetChildren()) do
-            if part:IsA("BasePart") then 
-                part.CanCollide = false 
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 end)
 
--- LOOP CHẠY AUTO DELIVERY
 task.spawn(function()
     while true do
         task.wait(0.01)
         if _G.AutoDeliveryRunning then
             pcall(function()
-                local char = localPlayer.Character 
-                local root = char and char:FindFirstChild("HumanoidRootPart") 
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChildOfClass("Humanoid")
                 if not root or not hum or hum.Health <= 1 then return end
+                local grabBoxInChar = char:FindFirstChild("GrabBox") local grabBoxInBackpack = localPlayer.Backpack:FindFirstChild("GrabBox")
+                local hasBox = grabBoxInChar or grabBoxInBackpack local delieveryFolder = workspace.JobGame.Delievery
                 
-                local grabBoxInChar = char:FindFirstChild("GrabBox") 
-                local grabBoxInBackpack = localPlayer.Backpack:FindFirstChild("GrabBox")
-                local hasBox = grabBoxInChar or grabBoxInBackpack
-                local delieveryFolder = workspace.JobGame.Delievery
-                
-                if grabBoxInChar then
-                    for _, p in pairs(grabBoxInChar:GetDescendants()) do
-                        if p:IsA("BasePart") then p.CanCollide = false end
-                    end
-                end
-
+                if grabBoxInChar then for _, p in pairs(grabBoxInChar:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
                 if not hasBox then
-                    if (root.Position - VNIL_VECTOR).Magnitude > 8 then 
-                        bypassTweenEngine(VNIL_VECTOR, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false) 
+                    if (root.Position - VNIL_VECTOR).Magnitude > 8 then bypassTweenEngine(VNIL_VECTOR, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false) 
                     else
                         local npc = delieveryFolder:FindFirstChild("NpcGrab")
                         if npc then 
                             root.CFrame = npc:GetPivot() * CFrame.new(0, 0, 2)
-                            root.AssemblyLinearVelocity = Vector3.new(0,0,0)
                             local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true) or npc:FindFirstChild("Nh\225\186\173n")
-                            if prompt then 
-                                prompt.MaxActivationDistance = 100
-                                prompt.RequiresLineOfSight = false
-                                repeat
-                                    fireproximityprompt(prompt)
-                                    task.wait(0.2)
-                                until localPlayer.Backpack:FindFirstChild("GrabBox") or char:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
+                            if prompt then prompt.MaxActivationDistance = 100 prompt.RequiresLineOfSight = false
+                                repeat fireproximityprompt(prompt) task.wait(0.2) until localPlayer.Backpack:FindFirstChild("GrabBox") or char:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
                             end 
                         end
                     end
                 else
-                    if grabBoxInBackpack and not grabBoxInChar then 
-                        hum:EquipTool(grabBoxInBackpack) 
-                    end
-                    
+                    if grabBoxInBackpack and not grabBoxInChar then hum:EquipTool(grabBoxInBackpack) end
                     local activeArrow = getActiveDeliveryArrow()
-                    
                     if activeArrow then
                         bypassTweenEngine(activeArrow.Position, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false)
-                        
                         local vitriFolder = delieveryFolder:FindFirstChild("Vitri") or delieveryFolder
                         for _, dest in pairs(vitriFolder:GetDescendants()) do
                             if dest:IsA("ProximityPrompt") or dest.Name:sub(1,14) == "DeliveryPrompt" then
                                 local parentPart = dest.Parent
                                 if parentPart and parentPart:IsA("BasePart") then
-                                    local dist2D = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(parentPart.Position.X, 0, parentPart.Position.Z)).Magnitude
-                                    if dist2D < 22 then
+                                    if (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(parentPart.Position.X, 0, parentPart.Position.Z)).Magnitude < 22 then
                                         root.CFrame = parentPart:GetPivot() * CFrame.new(0, 1.5, 0)
-                                        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                                        dest.MaxActivationDistance = 150
-                                        dest.RequiresLineOfSight = false
-                                        repeat
-                                            fireproximityprompt(dest)
-                                            task.wait(0.15)
-                                        until not char:FindFirstChild("GrabBox") and not localPlayer.Backpack:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
+                                        dest.MaxActivationDistance = 150 dest.RequiresLineOfSight = false
+                                        repeat fireproximityprompt(dest) task.wait(0.15) until not char:FindFirstChild("GrabBox") and not localPlayer.Backpack:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
                                         break
                                     end
                                 end
@@ -270,20 +212,9 @@ task.spawn(function()
     end
 end)
 
--- LOOP LOOT CHEST AN TOÀN
 local function findValidChestOnly()
-    local jobGame = workspace:FindFirstChild("JobGame")
-    local suKien = jobGame and jobGame:FindFirstChild("SuKien")
-    local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
-    if dropLoot then
-        for _, child in pairs(dropLoot:GetChildren()) do
-            if child:IsA("Model") or child:IsA("BasePart") then
-                if not string.find(string.lower(child.Name), "drop") then 
-                    return child 
-                end
-            end
-        end
-    end
+    local jobGame = workspace:FindFirstChild("JobGame") local suKien = jobGame and jobGame:FindFirstChild("SuKien") local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
+    if dropLoot then for _, child in pairs(dropLoot:GetChildren()) do if (child:IsA("Model") or child:IsA("BasePart")) and not string.find(string.lower(child.Name), "drop") then return child end end end
     return nil
 end
 
@@ -292,42 +223,18 @@ task.spawn(function()
         task.wait(0.01)
         if _G.AutoLoot then
             pcall(function()
-                local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-                local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if hum and hum.Health <= 1 then task.wait(1) return end
-                
                 local chest = findValidChestOnly()
                 if chest and root and hum then
-                    local targetPivot = chest:GetPivot()
-                    local chestPos = targetPivot.Position
-                    local safeSkyPos = Vector3.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
-                    
-                    if (root.Position - safeSkyPos).Magnitude > 15 then
-                        root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 45, chestPos.Z)
-                        task.wait(0.1)
-                    end
-                    
-                    root.CFrame = CFrame.new(safeSkyPos, chestPos)
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    
-                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) 
-                    if not prompt then
-                        prompt = chest:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    end
-                    
+                    local chestPos = chest:GetPivot().Position local safeSkyPos = Vector3.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
+                    if (root.Position - safeSkyPos).Magnitude > 15 then root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 45, chestPos.Z) task.wait(0.1) end
+                    root.CFrame = CFrame.new(safeSkyPos, chestPos) root.AssemblyLinearVelocity = Vector3.zero
+                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
                     if prompt then 
-                        prompt.MaxActivationDistance = 200
-                        prompt.RequiresLineOfSight = false 
-                        
-                        local grabCount = 0
-                        repeat
-                            fireproximityprompt(prompt)
-                            task.wait(0.25)
-                            
-                            if root and _G.AutoLoot then
-                                root.CFrame = CFrame.new(safeSkyPos, chestPos)
-                                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                            end
+                        prompt.MaxActivationDistance = 200 prompt.RequiresLineOfSight = false local grabCount = 0
+                        repeat fireproximityprompt(prompt) task.wait(0.25)
+                            if root and _G.AutoLoot then root.CFrame = CFrame.new(safeSkyPos, chestPos) root.AssemblyLinearVelocity = Vector3.zero end
                             grabCount = grabCount + 1
                         until not chest.Parent or not _G.AutoLoot or grabCount > 30
                     end
@@ -338,111 +245,132 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- INTERFACE TAB PVP (TÍCH HỢP TÀNG HÌNH SMART DESYNC)
+-- INTERFACE TAB PVP (FACE-UP DESYNC - MẶC ĐỊNH -4)
 -- ============================================================================
 
--- ====== [MỚI]: THÊM SECTION SMART DESYNC VÀO TAB PVP ======
-local SectionDesync = Tabs.PvP:AddSection("Chức Năng Tàng Hình (Smart Desync)")
+local SectionDesync = Tabs.PvP:AddSection("Chức Năng Nằm Ngửa Tàng Hình (Face-Up Desync)")
 _G.SmartDesyncState = false
-getgenv().DesyncDepth = -35
+getgenv().DesyncHeightOffset = -4 -- Mặc định cài đặt đã đổi thành -4
+
+local lastSafePos = nil
 
 SectionDesync:AddToggle("SmartDesyncToggle", {
-    Title = "Mở Tàng Hình Desync (Chống Mất Map)",
+    Title = "Mở Desync Nằm Ngửa Quay Mặt Lên",
     Default = false,
     Callback = function(state)
         _G.SmartDesyncState = state
-        if not state and localPlayer.Character then
-            local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-            local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hum then hum.CameraOffset = Vector3.new(0, 0, 0) end
-            if root then root.AssemblyLinearVelocity = Vector3.zero end
+        local char = localPlayer.Character
+        if not state and char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if hum then hum.CameraOffset = Vector3.zero end
+            if root and lastSafePos then root.CFrame = lastSafePos root.AssemblyLinearVelocity = Vector3.zero end
         end
     end
 })
 
-SectionDesync:AddSlider("DesyncDepthSlider", {
-    Title = "Độ Sâu Desync (Khoảng Cách Dìm)",
+-- KHOẢNG CHỈNH TỪ -100 ĐẾN 100, MẶC ĐỊNH -4
+SectionDesync:AddSlider("DesyncOffsetSlider", {
+    Title = "Khoảng Cách Đẩy Xác (Khoảng Cách Trục Y)",
     Min = -100,
-    Max = -10,
-    Default = -35,
+    Max = 100,
+    Default = -4,
     Rounding = 1,
-    Callback = function(val)
-        getgenv().DesyncDepth = val
-    end
+    Callback = function(val) getgenv().DesyncHeightOffset = val end
 })
 
--- VÒNG LẶP SMART DESYNC CHẠY NỀN VĨNH CỬU
-task.spawn(function()
-    while true do
-        RunService.Heartbeat:Wait()
-        if _G.SmartDesyncState and localPlayer.Character then
-            pcall(function()
-                local char = localPlayer.Character
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                
-                if root and hum and hum.Health > 0 then
-                    local realCF = root.CFrame
-                    root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-                    
-                    local desyncCF = realCF * CFrame.new(0, getgenv().DesyncDepth, 0)
-                    root.CFrame = desyncCF
-                    hum.CameraOffset = desyncCF:ToObjectSpace(CFrame.new(realCF.Position)).Position
+-- LOGIC LẬT NGỬA NHÂN VẬT QUAY MẶT LÊN TRỜI VỚI KHOẢNG CÁCH TÙY CHỈNH
+RunService.Heartbeat:Connect(function()
+    if _G.SmartDesyncState and localPlayer.Character then
+        pcall(function()
+            local char = localPlayer.Character
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local tool = char:FindFirstChildOfClass("Tool")
 
-                    RunService.RenderStepped:Wait()
+            if root and hum and hum.Health > 0 then
+                local realCF = root.CFrame
+                lastSafePos = realCF
 
-                    if root and _G.SmartDesyncState then
-                        root.CFrame = realCF
+                -- Khóa gia tốc rơi tự do
+                root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+
+                -- Tắt va chạm cho vũ khí
+                if tool then
+                    for _, part in ipairs(tool:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                            part.Massless = true
+                        end
                     end
                 end
-            end)
-        end
+
+                -- Tạo CFrame Lật Ngửa 90 Độ (Mặt hướng lên trời) + dịch vị trí theo khoảng cách cài đặt
+                local faceUpRotation = CFrame.Angles(math.rad(-90), 0, 0)
+                local fakeCF = (realCF * CFrame.new(0, getgenv().DesyncHeightOffset, 0)) * faceUpRotation
+
+                -- Gửi CFrame giả lập sang Server
+                root.CFrame = fakeCF
+                hum.CameraOffset = fakeCF:ToObjectSpace(realCF).Position
+
+                RunService.RenderStepped:Wait()
+
+                -- Trả lại CFrame thực tế ở Client
+                if root and _G.SmartDesyncState then
+                    root.CFrame = realCF
+                end
+            end
+        end)
     end
 end)
 
--- ====== CÁC CHỨC NĂNG PVP KHÁC ======
-local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox")
-SectionHitbox:AddInput("BoxX", { Title = "Hit Box Size X", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 5 end })
-SectionHitbox:AddInput("BoxY", { Title = "Hit Box Size Y", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 5 end })
-SectionHitbox:AddInput("BoxZ", { Title = "Hit Box Size Z", Default = "5", Numeric = true, Callback = function(val) getgenv().HitBoxZ = tonumber(val) or 5 end })
+-- HITBOX VŨ KHÍ & AUTO ATTACK
+local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox Vũ Khí")
+SectionHitbox:AddInput("BoxX", { Title = "Size X", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 8 end })
+SectionHitbox:AddInput("BoxY", { Title = "Size Y", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 8 end })
+SectionHitbox:AddInput("BoxZ", { Title = "Size Z", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxZ = tonumber(val) or 8 end })
+
 SectionHitbox:AddButton({
-    Title = "Kích Hoạt Hitbox Vũ Khí (Bản Thân)",
+    Title = "Phóng To Hitbox Vũ Khí",
     Callback = function()
         if localPlayer.Character then
             for _, tool in ipairs(localPlayer.Character:GetChildren()) do
                 if tool:IsA("Tool") then
-                    local targetPart = tool:FindFirstChild("Hitbox") or tool:FindFirstChild("Handle")
-                    if targetPart then
-                        targetPart.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ)
-                        local box = targetPart:FindFirstChild("MMB_SelectionBox") or Instance.new("SelectionBox", targetPart)
-                        box.Name = "MMB_SelectionBox" box.Adornee = targetPart box.LineThickness = 0.05 box.Color3 = Color3.fromRGB(0, 255, 0)
+                    for _, p in ipairs(tool:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            p.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ)
+                            p.Massless = true
+                            p.CanCollide = false
+                        end
                     end
                 end
             end
+            Fluent:Notify({ Title = "Hitbox Fixed", Content = "Đã phóng to kích thước đòn đánh!", Duration = 3 })
         end
     end
 })
 
 local SectionFeatures = Tabs.PvP:AddSection("Chức Năng Hỗ Trợ Chiến Đấu")
 local autoToolState = false
-SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh (Cầm Tool)", Default = false, Callback = function(state) autoToolState = state end })
+SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh Liên Tục", Default = false, Callback = function(state) autoToolState = state end })
+
 task.spawn(function()
     while true do
         task.wait(0.01)
         if autoToolState and localPlayer.Character then
             local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then pcall(function() tool:Activate() end) end
+            if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then 
+                pcall(function() tool:Activate() end) 
+            end
         end
     end
 end)
 
 _G.HitboxPvP = false SectionFeatures:AddToggle("HitboxRed", { Title = "Mở Rộng Hitbox Địch (Hộp Đỏ MMB)", Default = false, Callback = function(state) _G.HitboxPvP = state end })
-
-_G.SpeedPvP = false 
-SectionFeatures:AddToggle("BypassSpeed", { Title = "Bypass Speed Velocity (Anti-Kick)", Default = false, Callback = function(state) _G.SpeedPvP = state end })
+_G.SpeedPvP = false SectionFeatures:AddToggle("BypassSpeed", { Title = "Bypass Speed Velocity (Anti-Kick)", Default = false, Callback = function(state) _G.SpeedPvP = state end })
 SectionFeatures:AddSlider("VelocitySpeedSlider", { Title = "Tốc độ Velocity", Min = 20, Max = 120, Default = 65, Rounding = 1, Callback = function(val) getgenv().BypassVelocitySpeed = val end })
 
-_G.AutoHeal = false SectionFeatures:AddToggle("AutoHeal", { Title = "Tự Động Băng Gạc (Hồi Ngầm - Giữ Vũ Khí)", Default = false, Callback = function(state) _G.AutoHeal = state end })
+_G.AutoHeal = false SectionFeatures:AddToggle("AutoHeal", { Title = "Tự Động Băng Gạc (Hồi Ngầm)", Default = false, Callback = function(state) _G.AutoHeal = state end })
 
 task.spawn(function()
     while true do
@@ -576,9 +504,7 @@ RunService.Heartbeat:Connect(function()
         if hum.MoveDirection.Magnitude > 0 then
             local targetVelocity = hum.MoveDirection * getgenv().BypassVelocitySpeed
             root.AssemblyLinearVelocity = Vector3.new(targetVelocity.X, root.AssemblyLinearVelocity.Y, targetVelocity.Z)
-        else
-            root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-        end
+        else root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
     end
     
     if _G.AimlockPvP and not aimPlayerState then
@@ -629,5 +555,8 @@ Players.PlayerRemoving:Connect(function(p)
     if p.Character then for _, child in ipairs(p.Character:GetChildren()) do if toolBoxes[child] then toolBoxes[child]:Destroy() toolBoxes[child] = nil end end end
 end)
 
-Window:SelectTab(1)
-Fluent:Notify({ Title = "MEMAYBEO HUB V28.2", Content = "Đã tích hợp Smart Desync Tàng Hình vào Tab PvP!", Duration = 5 })
+-- TAB MẶC ĐỊNH
+Tabs.Farm:Select()
+
+task.wait(0.5)
+Fluent:Notify({ Title = "MEMAYBEO HUB V31.5", Content = "Đã chỉnh khoảng cách Desync mặc định thành -4!", Duration = 5 })
