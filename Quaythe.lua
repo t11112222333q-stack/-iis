@@ -15,7 +15,7 @@ WindUI:AddTheme({
 })
 
 local Window = WindUI:CreateWindow({
-    Title = "MEMAYBEO HUB | ULTRA SMART v31",
+    Title = "MEMAYBEO HUB | v32",
     Icon = "shield-check",
     Size = UDim2.fromOffset(580, 450),
     Theme = "ZyroTheme",
@@ -60,7 +60,7 @@ _G.AutoSpin = false
 _G.AutoGacha = false
 
 Tab:Toggle({ Title = "Auto Thu Tiền (Tất cả Plots)", Callback = function(s) _G.AutoCollect = s end })
-Tab:Toggle({ Title = "Auto Giải Đấu (v31 Treo Ngầm Không Mở UI)", Callback = function(s) _G.AutoTournament = s end })
+Tab:Toggle({ Title = "Auto Giải Đấu (v32 Sửa Lỗi Chạy Ngầm)", Callback = function(s) _G.AutoTournament = s end })
 Tab:Toggle({ Title = "Auto Hoạt Động Rảnh (Idle)", Callback = function(s) _G.AutoIdle = s end })
 Tab:Toggle({ Title = "Auto Nhặt Sò", Callback = function(s) _G.AutoSeashells = s end })
 Tab:Toggle({ Title = "Auto Vòng Quay (Chạy Ngầm Không Mở UI)", Callback = function(s) _G.AutoSpin = s end })
@@ -86,7 +86,7 @@ task.spawn(function()
     end
 end)
 
--- 2. Auto Giải Đấu (Bản v31: Đọc text ngầm trong hệ thống, UI đóng vẫn hoạt động chuẩn)
+-- 2. Auto Giải Đấu (Bản v32: Tập trung quét text trực tiếp của nút bấm để ra quyết định chính xác)
 local equippedThisRound = false
 
 task.spawn(function()
@@ -96,43 +96,47 @@ task.spawn(function()
                 local tournamentUI = PlayerGui:FindFirstChild("Tournament")
                 local isWaiting = false
                 
-                -- Đọc ngầm dữ liệu text lưu trữ bên trong hệ thống bất chấp UI ẩn/hiện
+                -- Định vị chính xác khu vực nút Join để đọc text trạng thái hàng đợi ngầm
                 if tournamentUI then
-                    -- Quét sâu vào toàn bộ hệ thống lưu chữ của bảng đấu để tìm thông tin thời gian thực
-                    for _, obj in ipairs(tournamentUI:GetDescendants()) do
-                        if obj:IsA("TextLabel") and obj.Text and obj.Text ~= "" then
-                            local text = string.lower(obj.Text)
-                            
-                            -- Bộ lọc chặn: Nếu hệ thống đang chạy đếm ngược (dạng XX:XX) hoặc ghi chữ đóng/chờ bắt đầu
-                            if string.match(text, "%d+:%d+") or string.find(text, "bắt đầu") or string.find(text, "đóng") or string.find(text, "hàng đợi bị") then
-                                isWaiting = true
-                                break
+                    local mainFrame = tournamentUI:FindFirstChild("Frame") and tournamentUI.Frame:FindFirstChild("Main")
+                    if mainFrame then
+                        local joinBtn = mainFrame:FindFirstChild("JoinButton", true) or mainFrame:FindFirstChild("Join", true)
+                        if joinBtn then
+                            -- Quét tất cả chữ nằm bên dưới nút Join này để xem có thông báo khóa không
+                            for _, label in ipairs(joinBtn:GetDescendants()) do
+                                if label:IsA("TextLabel") and label.Text and label.Text ~= "" then
+                                    local btnText = string.lower(label.Text)
+                                    -- Chỉ chặn khi chữ hiển thị đích danh là đang khóa hàng đợi
+                                    if string.find(btnText, "hàng đợi") or string.find(btnText, "bị đóng") or string.find(btnText, "close") then
+                                        isWaiting = true
+                                        break
+                                    end
+                                end
                             end
                         end
                     end
                 end
                 
-                -- ĐIỀU KIỆN KHÓA SPAM: Nếu game đang ở trạng thái chờ/đếm ngược -> Dừng ngay lập tức, không gửi Remote
+                -- Khóa chặn gửi Remote nếu hệ thống xác nhận nút Join đang ở trạng thái bị đóng
                 if isWaiting then
-                    equippedThisRound = false -- Reset để sẵn sàng mặc đồ cho vòng sau
+                    equippedThisRound = false
                     return
                 end
                 
-                -- NẾU HỆ THỐNG BÁO GIẢI ĐẤU ĐÃ MỞ (Hết đếm ngược hoàn toàn):
+                -- NẾU NÚT JOIN KHÔNG BỊ KHÓA (Giải đấu đang mở cửa, cho phép trả phí hoặc tham gia tự do):
                 if RemoteFolder:FindFirstChild("Tournament") then
-                    -- Tự động trang bị đội hình mạnh nhất (chỉ gửi duy nhất 1 lần tránh spam)
                     if not equippedThisRound then
                         RemoteFolder.Tournament:FireServer("equip_best")
                         equippedThisRound = true
-                        task.wait(0.5)
+                        task.wait(0.4)
                     end
                     
-                    -- Gửi Remote tham gia giải đấu ngầm trực tiếp lên Server game
+                    -- Thực hiện gửi yêu cầu tham gia ngầm lên server game
                     RemoteFolder.Tournament:FireServer("join")
                     RemoteFolder.Tournament:FireServer("join_tournament")
                 end
                 
-                task.wait(6) -- Giãn cách nghỉ hẳn 6 giây để Server phản hồi nhận hàng đợi, tuyệt đối không bị spam chat
+                task.wait(5) -- Nghỉ 5 giây chờ hệ thống xử lý hàng đợi
             end)
         end
     end
@@ -213,4 +217,4 @@ task.spawn(function()
     end
 end)
 
-WindUI:Notify({ Title = "MEMAYBEO HUB", Content = "Kích hoạt v31 Treo Giải Đấu Ngầm 100% không cần mở UI thành công!", Duration = 4 })
+WindUI:Notify({ Title = "MEMAYBEO HUB", Content = "Đã cập nhật bản v32 sửa lỗi treo ngầm chính xác!", Duration = 4 })
