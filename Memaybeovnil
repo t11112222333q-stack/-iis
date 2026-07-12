@@ -1,5 +1,5 @@
 -- ============================================================================
--- ⚔️ MEMAYBEO HUB - VERSION V31.5 (FULL INTEGRATED + FIX LAG + AUTO HIDE)
+-- ⚔️ MEMAYBEO HUB - VERSION V41 (GLOBAL KEY SCANNER & ESP INTEGRATED)
 -- ============================================================================
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -16,6 +16,16 @@ local Lighting = game:GetService("Lighting")
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
+-- ============================================================================
+-- 🔑 DATABASE HỆ THỐNG KEY / WHITELIST (Thêm tên người có key vào đây)
+-- ============================================================================
+getgenv().KeySystemDatabase = {
+    ["anhbathanhhoa"] = {Role = "Owner/Key VIP", Status = "Valid"},
+    ["memaybeo_admin"] = {Role = "Admin Key", Status = "Valid"},
+    ["player_vip1"] = {Role = "VIP Key 30 Days", Status = "Valid"},
+    ["player_vip2"] = {Role = "VIP Key Lifetime", Status = "Valid"}
+}
+
 -- CONFIG SPEED SAFE BYPASS
 getgenv().CHEST_SPEED_TWEEN = 75 
 getgenv().GRAB_SPEED_TWEEN = 60 
@@ -30,16 +40,25 @@ local AIMLOCK_RADIUS = 35
 local VNIL_VECTOR = Vector3.new(-240.144531, -143.0, -580.035645) 
 local HOSPITAL_POSITION = Vector3.new(150, -145, 200)
 
-getgenv().BypassVelocitySpeed = 65 
+getgenv().BypassVelocitySpeed = 60 
+
+-- CONFIG PROFILE OVERRIDE
+getgenv().NewName = "anhbathanhhoa"
+getgenv().NewLevel = "20"
+getgenv().NewRole = "ADMIN"
+getgenv().RoleColorMode = "Đỏ"
+_G.AutoOverride = false
 
 local toolBoxes = {}
 local folderESP = workspace:FindFirstChild("ESP") or Instance.new("Folder", workspace)
 folderESP.Name = "ESP"
 
+local weaponHistory = {} 
+
 -- KHỞI TẠO MENU FLUENT
 local Window = Fluent:CreateWindow({
-    Title = "MEMAYBEO HUB V31.5",
-    SubTitle = "Far Face-Up Lie Down Desync",
+    Title = "MEMAYBEO HUB V41",
+    SubTitle = "Global Key Scanner System",
     TabWidth = 140,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = false, 
@@ -48,303 +67,240 @@ local Window = Fluent:CreateWindow({
 })
 
 local Tabs = {
+    Profile = Window:AddTab({ Title = "Hồ Sơ", Icon = "rbxassetid://4483345998" }),
     Farm = Window:AddTab({ Title = "Farm", Icon = "rbxassetid://4483345998" }),
     PvP = Window:AddTab({ Title = "PvP", Icon = "rbxassetid://4483345998" }),
     Server = Window:AddTab({ Title = "Server", Icon = "rbxassetid://4483345998" }),
     FixLag = Window:AddTab({ Title = "Fix Lag", Icon = "rbxassetid://4483345998" })
 }
 
+-- MỚI VÔ LÀ ẨN MENU LUÔN NGAY LẬP TỨC
+local menuVisible = false
+task.spawn(function()
+    task.wait(0.1)
+    pcall(function()
+        if Window.Minimize then 
+            Window:Minimize(true) 
+        elseif Window.Root then
+            Window.Root.Enabled = false
+        end
+    end)
+end)
+
 -- ============================================================================
--- 📲 LOGIC CẢM ỨNG: TỰ ĐỘNG ẨN KHI VÀO GAME & NHẤN 3 NGÓN TAY 3 LẦN ĐỂ BẬT/TẮT
+-- 👤 TAB 1: TÙY CHỈNH HỒ SƠ
 -- ============================================================================
-local menuVisible = false -- Mặc định ẩn menu ngay từ đầu
+local SectionProfile = Tabs.Profile:AddSection("Tùy Chỉnh Hiển Thị")
+
+SectionProfile:AddInput("InpName", {Title = "Đổi Tên", Default = getgenv().NewName, Callback = function(v) getgenv().NewName = v end})
+SectionProfile:AddInput("InpLv", {Title = "Đổi Cấp Độ", Default = getgenv().NewLevel, Callback = function(v) getgenv().NewLevel = v end})
+SectionProfile:AddInput("InpRole", {Title = "Đổi Vai Trò", Default = getgenv().NewRole, Callback = function(v) getgenv().NewRole = v end})
+
+SectionProfile:AddDropdown("DropdownRoleColor", {
+    Title = "Màu Sắc Vai Trò",
+    Values = {"Đỏ", "Cam", "Vàng", "Lục", "Lam", "Tím", "Trắng", "7 Màu Cầu Vồng"},
+    CurrentValue = "Đỏ",
+    Callback = function(v) getgenv().RoleColorMode = v end
+})
+
+SectionProfile:AddToggle("ToggleOverride", {
+    Title = "Tự đồng ghi đè liên tục", 
+    Default = false, 
+    Callback = function(state) _G.AutoOverride = state end 
+})
+
+local colorMap = {
+    ["Đỏ"] = Color3.fromRGB(255, 0, 0),
+    ["Cam"] = Color3.fromRGB(255, 127, 0),
+    ["Vàng"] = Color3.fromRGB(255, 255, 0),
+    ["Lục"] = Color3.fromRGB(0, 255, 0),
+    ["Lam"] = Color3.fromRGB(0, 127, 255),
+    ["Tím"] = Color3.fromRGB(139, 0, 255),
+    ["Trắng"] = Color3.fromRGB(255, 255, 255)
+}
+
+local rainbowColor = Color3.fromRGB(255, 0, 0)
+task.spawn(function()
+    while true do
+        for i = 0, 1, 0.005 do
+            rainbowColor = Color3.fromHSV(i, 1, 1)
+            task.wait(0.02)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.3) 
+        if _G.AutoOverride then
+            pcall(function()
+                local myUserName = string.lower(localPlayer.Name)
+                local myDisplayName = string.lower(localPlayer.DisplayName)
+                local finalColor = colorMap[getgenv().RoleColorMode] or rainbowColor
+                if getgenv().RoleColorMode == "7 Màu Cầu Vồng" then finalColor = rainbowColor end
+
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("TextLabel") then
+                        local text = string.lower(obj.Text)
+                        local name = string.lower(obj.Name)
+                        if string.find(text, myUserName) or string.find(text, myDisplayName) or string.find(text, "anhbathanhhoa") or name == "namelabel" or name == "titlename" or name == "username" then obj.Text = getgenv().NewName end
+                        if string.find(text, "cấp độ") or string.find(text, "level") or string.find(text, "lv") or name == "levellabel" then obj.Text = "Cấp độ: " .. getgenv().NewLevel end
+                        if string.find(text, "khách") or string.find(text, "vip") or string.find(text, "admin") or string.find(text, "thành viên") or name == "rolelabel" or name == "ranklabel" or name == "grouplabel" then
+                            obj.Text = getgenv().NewRole
+                            obj.TextColor3 = finalColor
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ============================================================================
+-- 📲 CƠ CHẾ CẢM ỨNG CHẠM 3 NGÓN ẤN 3 LẦN ĐỂ ẨN/HIỆN MENU
+-- ============================================================================
 local tripleFingerTapCount = 0
 local lastTapTime = 0
 local activeTouches = {}
 
--- Thực hiện ẩn Menu ngay lập tức sau khi load
-task.spawn(function()
-    task.wait(0.1)
-    if Window.Minimize then
-        Window:Minimize(true)
-    end
-end)
-
 UIS.TouchStarted:Connect(function(touch, gameProcessed)
     activeTouches[touch] = true
-    
-    -- Đếm số ngón tay đang chạm màn hình
     local currentTouchCount = 0
-    for _ in pairs(activeTouches) do
-        currentTouchCount = currentTouchCount + 1
-    end
+    for _ in pairs(activeTouches) do currentTouchCount = currentTouchCount + 1 end
     
-    -- Nếu chạm chính xác bằng 3 ngón tay
     if currentTouchCount == 3 then
         local currentTime = tick()
-        if currentTime - lastTapTime < 0.6 then
-            tripleFingerTapCount = tripleFingerTapCount + 1
-        else
-            tripleFingerTapCount = 1
+        if currentTime - lastTapTime < 0.5 then 
+            tripleFingerTapCount = tripleFingerTapCount + 1 
+        else 
+            tripleFingerTapCount = 1 
         end
         lastTapTime = currentTime
         
-        -- Khi đã đủ 3 lần bấm (mỗi lần bằng 3 ngón)
         if tripleFingerTapCount >= 3 then
             tripleFingerTapCount = 0
             menuVisible = not menuVisible
-            if Window.Minimize then 
-                Window:Minimize(not menuVisible) 
-            end
+            
+            pcall(function()
+                if Window.Minimize then 
+                    Window:Minimize(not menuVisible) 
+                elseif Window.Root then
+                    Window.Root.Enabled = menuVisible
+                end
+            end)
+            
             Fluent:Notify({ 
                 Title = "Menu Toggle", 
-                Content = menuVisible and "Đã hiện Menu!" or "Đã ẩn Menu!", 
+                Content = menuVisible and "Đã hiện Menu V41!" or "Đã ẩn Menu V41!", 
                 Duration = 2 
             })
         end
     end
 end)
 
-UIS.TouchEnded:Connect(function(touch)
-    activeTouches[touch] = nil
+UIS.TouchEnded:Connect(function(touch) 
+    activeTouches[touch] = nil 
 end)
 
 -- ============================================================================
--- ⚡ LOGIC XỬ LÝ FIX LAG (FPS BOOST & REDUCE PARTS)
+-- ⚡ LOGIC XỬ LÝ FIX LAG
 -- ============================================================================
 local hiddenPartsBackup = {}
-
 local function toggleFPSBoost(state)
     if state then
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 9e9
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.Material = Enum.Material.SmoothPlastic
-                v.Reflectance = 0
-            end
-        end
-    else
-        Lighting.GlobalShadows = true
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-    end
+        Lighting.GlobalShadows = false FogEnd = 9e9 settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        for _, v in ipairs(workspace:GetDescendants()) do if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic v.Reflectance = 0 end end
+    else Lighting.GlobalShadows = true settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end
 end
 
 local function reduceParts(percent, state)
     if state then
         local allParts = {}
         for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") and not part:IsDescendantOf(localPlayer.Character) and not part.Parent:FindFirstChildOfClass("Humanoid") then
-                table.insert(allParts, part)
-            end
+            if part:IsA("BasePart") and not part:IsDescendantOf(localPlayer.Character) and not part.Parent:FindFirstChildOfClass("Humanoid") then table.insert(allParts, part) end
         end
-        
         local countToHide = math.floor(#allParts * (percent / 100))
         for i = 1, countToHide do
             local p = allParts[i]
-            if p and p.Parent then
-                hiddenPartsBackup[p] = p.LocalTransparencyModifier
-                p.LocalTransparencyModifier = 1
-            end
+            if p and p.Parent then hiddenPartsBackup[p] = p.LocalTransparencyModifier p.LocalTransparencyModifier = 1 end
         end
     else
-        for part, oldTrans in pairs(hiddenPartsBackup) do
-            if part and part.Parent then
-                part.LocalTransparencyModifier = oldTrans
-            end
-        end
+        for part, oldTrans in pairs(hiddenPartsBackup) do if part and part.Parent then part.LocalTransparencyModifier = oldTrans end end
         hiddenPartsBackup = {}
     end
 end
 
 local function clearEverything()
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
-            obj:Destroy()
-        end
+        if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then obj:Destroy() end
     end
-    Lighting:ClearAllChildren()
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 9e9
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Lighting:ClearAllChildren() Lighting.GlobalShadows = false Lighting.FogEnd = 9e9 settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
     Fluent:Notify({ Title = "Fix Lag", Content = "Đã dọn dẹp sạch sẽ hiệu ứng & đồ họa!", Duration = 3 })
 end
 
--- ============================================================================
--- 🚀 CÀI ĐẶT TAB FIX LAG
--- ============================================================================
 local SectionFixLag = Tabs.FixLag:AddSection("Tối Ưu Hoá Đồ Hoạ (Fix Lag)")
-
-SectionFixLag:AddToggle("FPSBoost", {
-    Title = "FPS Boost",
-    Default = false,
-    Callback = function(val)
-        _G.FPSBoostState = val
-        toggleFPSBoost(val)
-    end
-})
-
-SectionFixLag:AddToggle("Reduce20Parts", {
-    Title = "Reduce 20% Parts",
-    Default = false,
-    Callback = function(val)
-        _G.Reduce20State = val
-        reduceParts(20, val)
-    end
-})
-
-SectionFixLag:AddToggle("Reduce40Parts", {
-    Title = "Reduce 40% Parts",
-    Default = false,
-    Callback = function(val)
-        _G.Reduce40State = val
-        reduceParts(40, val)
-    end
-})
-
-SectionFixLag:AddToggle("Reduce60Parts", {
-    Title = "Reduce 60% Parts",
-    Default = false,
-    Callback = function(val)
-        _G.Reduce60State = val
-        reduceParts(60, val)
-    end
-})
-
-SectionFixLag:AddToggle("Reduce100Parts", {
-    Title = "Reduce 100% Parts",
-    Default = false,
-    Callback = function(val)
-        _G.Reduce100State = val
-        reduceParts(100, val)
-    end
-})
-
-SectionFixLag:AddToggle("ClearEverything", {
-    Title = "Clear Everything",
-    Description = "Xóa decal, particle, giảm đồ họa tối đa",
-    Default = false,
-    Callback = function(val)
-        if val then
-            clearEverything()
-        end
-    end
-})
+SectionFixLag:AddToggle("FPSBoost", { Title = "FPS Boost", Default = false, Callback = function(val) _G.FPSBoostState = val toggleFPSBoost(val) end })
+SectionFixLag:AddToggle("Reduce20Parts", { Title = "Reduce 20% Parts", Default = false, Callback = function(val) _G.Reduce20State = val reduceParts(20, val) end })
+SectionFixLag:AddToggle("Reduce40Parts", { Title = "Reduce 40% Parts", Default = false, Callback = function(val) _G.Reduce40State = val reduceParts(40, val) end })
+SectionFixLag:AddToggle("Reduce60Parts", { Title = "Reduce 60% Parts", Default = false, Callback = function(val) _G.Reduce60State = val reduceParts(60, val) end })
+SectionFixLag:AddToggle("Reduce100Parts", { Title = "Reduce 100% Parts", Default = false, Callback = function(val) _G.Reduce100State = val reduceParts(100, val) end })
+SectionFixLag:AddToggle("ClearEverything", { Title = "Clear Everything", Description = "Xóa decal, particle, giảm đồ họa tối đa", Default = false, Callback = function(val) if val then clearEverything() end end })
 
 -- ============================================================================
--- 🌐 CHỨC NĂNG SERVER HOP (TAB SERVER)
+-- 🌐 CHỨC NĂNG SERVER HOP
 -- ============================================================================
 local SectionServer = Tabs.Server:AddSection("Quản Lý Máy Chủ (Server Hop)")
-
 local function HopServer(targetType)
-    Fluent:Notify({ Title = "Server Hop", Content = "Đang quét danh sách máy chủ...", Duration = 3 })
-    
-    local placeId = game.PlaceId
-    local currentJobId = game.JobId
-    local cursor = ""
-    local candidateServer = nil
-    local bestCount = (targetType == "Fullest") and -1 or 999
-    
+    local placeId = game.PlaceId local currentJobId = game.JobId local cursor = "" local candidateServer = nil local bestCount = (targetType == "Fullest") and -1 or 999
     pcall(function()
         repeat
             local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/0?sortOrder=Desc&limit=100" .. (cursor ~= "" and "&cursor=" .. cursor or "")
             local req = request or http_request or (syn and syn.request) or (http and http.request)
-            
-            if not req then
-                Fluent:Notify({ Title = "Lỗi", Content = "Executor không hỗ trợ HTTP Request!", Duration = 3 })
-                return
-            end
-            
-            local res = req({ Url = url, Method = "GET" })
-            local body = HttpService:JSONDecode(res.Body)
-            
+            if not req then return end
+            local res = req({ Url = url, Method = "GET" }) local body = HttpService:JSONDecode(res.Body)
             if body and body.data then
                 for _, s in ipairs(body.data) do
                     if s.id ~= currentJobId and s.playing < s.maxPlayers and s.playing > 0 then
-                        if targetType == "Fullest" then
-                            if s.playing > bestCount and s.playing < s.maxPlayers then
-                                bestCount = s.playing
-                                candidateServer = s.id
-                            end
-                        elseif targetType == "Lowest" then
-                            if s.playing < bestCount then
-                                bestCount = s.playing
-                                candidateServer = s.id
-                            end
-                        end
+                        if targetType == "Fullest" then if s.playing > bestCount and s.playing < s.maxPlayers then bestCount = s.playing candidateServer = s.id end
+                        elseif targetType == "Lowest" then if s.playing < bestCount then bestCount = s.playing candidateServer = s.id end end
                     end
                 end
             end
             cursor = body and body.nextPageCursor or nil
         until not cursor or candidateServer ~= nil
     end)
-
-    if candidateServer then
-        Fluent:Notify({ Title = "Đang Chuyển Server", Content = "Đã tìm thấy server (" .. tostring(bestCount) .. " người). Đang kết nối...", Duration = 4 })
-        TeleportService:TeleportToPlaceInstance(placeId, candidateServer, localPlayer)
-    else
-        Fluent:Notify({ Title = "Thất Bại", Content = "Không tìm thấy server phù hợp! Vui lòng thử lại.", Duration = 4 })
-    end
+    if candidateServer then TeleportService:TeleportToPlaceInstance(placeId, candidateServer, localPlayer) end
 end
-
-SectionServer:AddButton({ Title = "Chuyển Tới Server Đông Nhất (Còn Chỗ)", Callback = function() HopServer("Fullest") end })
+SectionServer:AddButton({ Title = "Chuyển Tới Server Đông Nhất", Callback = function() HopServer("Fullest") end })
 SectionServer:AddButton({ Title = "Chuyển Tới Server Ít Người Nhất", Callback = function() HopServer("Lowest") end })
-SectionServer:AddButton({ Title = "Rejoin (Vào Lại Server Hiện Tại)", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer) end })
+SectionServer:AddButton({ Title = "Rejoin", Callback = function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer) end })
 
 -- ============================================================================
--- ✈️ TWEEN ENGINE DYNAMIC
+-- ✈️ TWEEN ENGINE DYNAMIC (FARM ONLY)
 -- ============================================================================
 local function bypassTweenEngine(targetPos, speed, checkGlobalVariable, ignoreHeight)
-    local char = localPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum or hum.Health <= 1 then return end
-
-    local finalTargetPos = targetPos
-    if not ignoreHeight then finalTargetPos = Vector3.new(targetPos.X, -137.5, targetPos.Z) end
-
-    local distance = (root.Position - finalTargetPos).Magnitude
-    if distance < 1.5 then return end 
-
-    local duration = distance / speed
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-    local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(finalTargetPos)})
-    
+    local finalTargetPos = targetPos if not ignoreHeight then finalTargetPos = Vector3.new(targetPos.X, -137.5, targetPos.Z) end
+    local distance = (root.Position - finalTargetPos).Magnitude if distance < 1.5 then return end 
+    local tween = TweenService:Create(root, TweenInfo.new(distance / speed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(finalTargetPos)})
     tween:Play()
-    local lastPos = root.Position
-    local stuckTicks = 0
-
+    local lastPos = root.Position local stuckTicks = 0
     while tween.PlaybackState == Enum.PlaybackState.Playing and _G[checkGlobalVariable] do
         if hum.Health <= 1 then tween:Cancel() break end
-        if (root.Position - lastPos).Magnitude < 0.2 then
-            stuckTicks = stuckTicks + 1
-            if stuckTicks > 40 then 
-                root.CFrame = ignoreHeight and (root.CFrame * CFrame.new(0, 2, -2)) or (root.CFrame * CFrame.new(0, 4, -5))
-                stuckTicks = 0
-            end
-        else stuckTicks = 0 end
-        lastPos = root.Position
-        root.AssemblyLinearVelocity = Vector3.zero
-        RunService.Heartbeat:Wait()
+        if (root.Position - lastPos).Magnitude < 0.2 then stuckTicks = stuckTicks + 1 if stuckTicks > 40 then root.CFrame = ignoreHeight and (root.CFrame * CFrame.new(0, 2, -2)) or (root.CFrame * CFrame.new(0, 4, -5)) stuckTicks = 0 end else stuckTicks = 0 end
+        lastPos = root.Position root.AssemblyLinearVelocity = Vector3.zero RunService.Heartbeat:Wait()
     end
 end
 
--- REALTIME ARROW FILTER
 local function getActiveDeliveryArrow()
     local delieveryFolder = workspace:FindFirstChild("JobGame") and workspace.JobGame:FindFirstChild("Delievery")
     local arrowSpawn = delieveryFolder and delieveryFolder:FindFirstChild("ArrowSpawn")
     if not arrowSpawn then return nil end
-
     for _, folder in pairs(arrowSpawn:GetChildren()) do
         if string.find(folder.Name, localPlayer.Name) or string.find(folder.Name, "Grab") then
             local arrow = folder:FindFirstChild("Arrow") or folder:FindFirstChildWhichIsA("BasePart", true)
             if arrow and (arrow.Position - HOSPITAL_POSITION).Magnitude > 90 then return arrow end
-        end
-    end
-    for _, desc in pairs(arrowSpawn:GetDescendants()) do
-        if (desc.Name == "Arrow" or desc:IsA("MeshPart") or desc:IsA("BasePart")) and desc.Transparency < 0.9 then
-            if (desc.Position - HOSPITAL_POSITION).Magnitude > 90 then return desc end
         end
     end
     return nil
@@ -353,20 +309,18 @@ end
 -- INTERFACE TAB FARM
 local SectionDelivery = Tabs.Farm:AddSection("Auto Job Delivery (Fly Mode)")
 _G.AutoDeliveryRunning = false
-SectionDelivery:AddToggle("RunDelivery", { Title = "Bật Giao Hàng V31.5", Default = false, Callback = function(state) _G.AutoDeliveryRunning = state end })
+SectionDelivery:AddToggle("RunDelivery", { Title = "Bật Giao Hàng V37", Default = false, Callback = function(state) _G.AutoDeliveryRunning = state end })
 SectionDelivery:AddSlider("TweenSpeedGrab", { Title = "Tốc độ di chuyển Grab", Min = 20, Max = 150, Default = 60, Rounding = 1, Callback = function(v) getgenv().GRAB_SPEED_TWEEN = v end })
 
 local SectionChest = Tabs.Farm:AddSection("Auto Loot Chest")
 _G.AutoLoot = false
-SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương (Tele Lại Vị Trí Cũ)", Default = false, Callback = function(state) _G.AutoLoot = state end })
+SectionChest:AddToggle("RunLootChest", { Title = "Kích Hoạt Săn Rương", Default = false, Callback = function(state) _G.AutoLoot = state end })
 
 RunService.Stepped:Connect(function()
-    if (_G.AutoDeliveryRunning or _G.AutoLoot) and localPlayer.Character then
+    if (_G.AutoDeliveryRunning or _G.AutoLoot or _G.FlyTopDown or _G.FlyOrbitAround) and localPlayer.Character then
         local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum:GetState() ~= Enum.HumanoidStateType.Running then hum:ChangeState(Enum.HumanoidStateType.Running) end
-        for _, part in pairs(localPlayer.Character:GetChildren()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
-        end
+        for _, part in pairs(localPlayer.Character:GetChildren()) do if part:IsA("BasePart") then part.CanCollide = false end end
     end
 end)
 
@@ -377,20 +331,14 @@ task.spawn(function()
             pcall(function()
                 local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChildOfClass("Humanoid")
                 if not root or not hum or hum.Health <= 1 then return end
-                local grabBoxInChar = char:FindFirstChild("GrabBox") local grabBoxInBackpack = localPlayer.Backpack:FindFirstChild("GrabBox")
-                local hasBox = grabBoxInChar or grabBoxInBackpack local delieveryFolder = workspace.JobGame.Delievery
-                
+                local grabBoxInChar = char:FindFirstChild("GrabBox") local grabBoxInBackpack = localPlayer.Backpack:FindFirstChild("GrabBox") local hasBox = grabBoxInChar or grabBoxInBackpack local delieveryFolder = workspace.JobGame.Delievery
                 if grabBoxInChar then for _, p in pairs(grabBoxInChar:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
                 if not hasBox then
                     if (root.Position - VNIL_VECTOR).Magnitude > 8 then bypassTweenEngine(VNIL_VECTOR, getgenv().GRAB_SPEED_TWEEN, "AutoDeliveryRunning", false) 
                     else
                         local npc = delieveryFolder:FindFirstChild("NpcGrab")
-                        if npc then 
-                            root.CFrame = npc:GetPivot() * CFrame.new(0, 0, 2)
-                            local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true) or npc:FindFirstChild("Nh\225\186\173n")
-                            if prompt then prompt.MaxActivationDistance = 100 prompt.RequiresLineOfSight = false
-                                repeat fireproximityprompt(prompt) task.wait(0.2) until localPlayer.Backpack:FindFirstChild("GrabBox") or char:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
-                            end 
+                        if npc then root.CFrame = npc:GetPivot() * CFrame.new(0, 0, 2) local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true) or npc:FindFirstChild("Nh\225\186\173n")
+                            if prompt then prompt.MaxActivationDistance = 100 prompt.RequiresLineOfSight = false repeat fireproximityprompt(prompt) task.wait(0.2) until localPlayer.Backpack:FindFirstChild("GrabBox") or char:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning end 
                         end
                     end
                 else
@@ -404,8 +352,7 @@ task.spawn(function()
                                 local parentPart = dest.Parent
                                 if parentPart and parentPart:IsA("BasePart") then
                                     if (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(parentPart.Position.X, 0, parentPart.Position.Z)).Magnitude < 22 then
-                                        root.CFrame = parentPart:GetPivot() * CFrame.new(0, 1.5, 0)
-                                        dest.MaxActivationDistance = 150 dest.RequiresLineOfSight = false
+                                        root.CFrame = parentPart:GetPivot() * CFrame.new(0, 1.5, 0) dest.MaxActivationDistance = 150 dest.RequiresLineOfSight = false
                                         repeat fireproximityprompt(dest) task.wait(0.15) until not char:FindFirstChild("GrabBox") and not localPlayer.Backpack:FindFirstChild("GrabBox") or not _G.AutoDeliveryRunning
                                         break
                                     end
@@ -419,18 +366,9 @@ task.spawn(function()
     end
 end)
 
--- LOGIC AUTO LOOT CHEST + TELE VỀ CŨ
 local function findValidChestOnly()
-    local jobGame = workspace:FindFirstChild("JobGame") 
-    local suKien = jobGame and jobGame:FindFirstChild("SuKien") 
-    local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
-    if dropLoot then 
-        for _, child in pairs(dropLoot:GetChildren()) do 
-            if (child:IsA("Model") or child:IsA("BasePart")) and not string.find(string.lower(child.Name), "drop") then 
-                return child 
-            end 
-        end 
-    end
+    local jobGame = workspace:FindFirstChild("JobGame") local suKien = jobGame and jobGame:FindFirstChild("SuKien") local dropLoot = suKien and suKien:FindFirstChild("DropLoot")
+    if dropLoot then for _, child in pairs(dropLoot:GetChildren()) do if (child:IsA("Model") or child:IsA("BasePart")) and not string.find(string.lower(child.Name), "drop") then return child end end end
     return nil
 end
 
@@ -439,53 +377,20 @@ task.spawn(function()
         task.wait(0.02)
         if _G.AutoLoot then
             pcall(function()
-                local char = localPlayer.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid") 
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                
-                if not root or not hum or hum.Health <= 1 then 
-                    task.wait(1) 
-                    return 
-                end
-
+                local char = localPlayer.Character local hum = char and char:FindFirstChildOfClass("Humanoid") local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root or not hum or hum.Health <= 1 then task.wait(0.5) return end
                 local chest = findValidChestOnly()
                 if chest and chest.Parent then
-                    local lastStandingCF = root.CFrame 
-                    local chestPos = chest:GetPivot().Position 
-                    
-                    local safePos = CFrame.new(chestPos.X, chestPos.Y + 6.5, chestPos.Z) * CFrame.Angles(math.rad(-90), 0, 0)
-                    
-                    if (root.Position - chestPos).Magnitude > 20 then 
-                        root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 35, chestPos.Z) 
-                        task.wait(0.15) 
-                    end
-                    
-                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) 
-                        or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
-                        
-                    if prompt then 
-                        prompt.MaxActivationDistance = 250 
-                        prompt.RequiresLineOfSight = false 
-                        local grabCount = 0
-                        
-                        repeat
-                            if not _G.AutoLoot or not hum or hum.Health <= 1 or not chest.Parent then break end
-                            
-                            root.CFrame = safePos
-                            root.AssemblyLinearVelocity = Vector3.zero
-                            
-                            fireproximityprompt(prompt)
-                            task.wait(0.3) 
-                            
-                            grabCount = grabCount + 1
+                    local lastStandingCF = root.CFrame local chestPos = chest:GetPivot().Position local safePos = CFrame.new(chestPos.X, chestPos.Y + 8.5, chestPos.Z)
+                    for _, p in ipairs(char:GetChildren()) do if p:IsA("BasePart") then p.CanCollide = false end end
+                    if (root.Position - chestPos).Magnitude > 25 then root.CFrame = CFrame.new(chestPos.X, chestPos.Y + 30, chestPos.Z) root.AssemblyLinearVelocity = Vector3.zero task.wait(0.15) end
+                    local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    if prompt then prompt.MaxActivationDistance = 300 prompt.RequiresLineOfSight = false local grabCount = 0
+                        repeat if not _G.AutoLoot or not hum or hum.Health <= 1 or not chest.Parent then break end
+                            root.CFrame = safePos root.AssemblyLinearVelocity = Vector3.zero fireproximityprompt(prompt) task.wait(0.2) grabCount = grabCount + 1
                         until not chest.Parent or grabCount > 25
                     end
-
-                    if hum and hum.Health > 1 and root and lastStandingCF then
-                        root.CFrame = lastStandingCF
-                        root.AssemblyLinearVelocity = Vector3.zero
-                        task.wait(0.2)
-                    end
+                    if hum and hum.Health > 1 and root and lastStandingCF then root.CFrame = lastStandingCF root.AssemblyLinearVelocity = Vector3.zero task.wait(0.2) end
                 end
             end)
         end
@@ -493,135 +398,105 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- INTERFACE TAB PVP
+-- 🔑 INTERFACE TAB PVP & GLOBAL KEY SCANNER SYSTEM
 -- ============================================================================
-local SectionDesync = Tabs.PvP:AddSection("Chức Năng Nằm Ngửa Tàng Hình (Face-Up Desync)")
-_G.SmartDesyncState = false
-getgenv().DesyncHeightOffset = -4 
+local SectionKeyCheck = Tabs.PvP:AddSection("🔑 Quét Key Server")
 
-local lastSafePos = nil
+_G.KeyCheckESPState = false
+SectionKeyCheck:AddToggle("KeyCheckToggle", { Title = "Kích Hoạt ESP Check Nhãn Key", Default = false, Callback = function(state) _G.KeyCheckESPState = state end })
 
-SectionDesync:AddToggle("SmartDesyncToggle", {
-    Title = "Mở Desync Nằm Ngửa Quay Mặt Lên",
-    Default = false,
-    Callback = function(state)
-        _G.SmartDesyncState = state
-        local char = localPlayer.Character
-        if not state and char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if hum then hum.CameraOffset = Vector3.zero end
-            if root and lastSafePos then root.CFrame = lastSafePos root.AssemblyLinearVelocity = Vector3.zero end
+local function TriggerGlobalServerScan()
+    local foundCount = 0
+    local logString = ""
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        local nameLower = string.lower(p.Name)
+        local keyData = getgenv().KeySystemDatabase[p.Name] or getgenv().KeySystemDatabase[nameLower]
+        
+        if keyData then
+            foundCount = foundCount + 1
+            logString = logString .. "- " .. p.Name .. " (" .. keyData.Role .. ")\n"
         end
     end
+    
+    if foundCount > 0 then
+        Fluent:Notify({
+            Title = "ĐÃ QUÉT XONG SERVER!",
+            Content = "Tìm thấy " .. foundCount .. " người có KEY:\n" .. logString,
+            Duration = 7
+        })
+    else
+        Fluent:Notify({
+            Title = "ĐÃ QUÉT XONG SERVER!",
+            Content = "An toàn! Server này không có ai nằm trong dữ liệu Key Hệ Thống.",
+            Duration = 5
+        })
+    end
+end
+
+SectionKeyCheck:AddButton({
+    Title = " Quét Toàn Bộ Người Chơi Trong Server",
+    Description = "Quét nhanh toàn bộ server để phát hiện ai có tên trùng database Key",
+    Callback = function() TriggerGlobalServerScan() end
 })
 
-SectionDesync:AddSlider("DesyncOffsetSlider", {
-    Title = "Khoảng Cách Đẩy Xác (Khoảng Cách Trục Y)",
-    Min = -100,
-    Max = 100,
-    Default = -4,
-    Rounding = 1,
-    Callback = function(val) getgenv().DesyncHeightOffset = val end
+-- TỰ ĐỘNG QUÉT 1 LẦN NGAY KHI VỪA BẬT SCRIPT
+task.spawn(function()
+    task.wait(2)
+    TriggerGlobalServerScan()
+end)
+
+local SectionDesync = Tabs.PvP:AddSection("Chức Năng Nằm Ngửa Tàng Hình (Face-Up Desync)")
+_G.SmartDesyncState = false getgenv().DesyncHeightOffset = -4 local lastSafePos = nil
+SectionDesync:AddToggle("SmartDesyncToggle", {
+    Title = "Mở Desync Nằm Ngửa Quay Mặt Lên", Default = false,
+    Callback = function(state)
+        _G.SmartDesyncState = state local char = localPlayer.Character
+        if not state and char then local hum = char:FindFirstChildOfClass("Humanoid") local root = char:FindFirstChild("HumanoidRootPart") if hum then hum.CameraOffset = Vector3.zero end if root and lastSafePos then root.CFrame = lastSafePos root.AssemblyLinearVelocity = Vector3.zero end end
+    end
 })
+SectionDesync:AddSlider("DesyncOffsetSlider", { Title = "Khoảng Cách Đẩy Xác", Min = -100, Max = 100, Default = -4, Rounding = 1, Callback = function(val) getgenv().DesyncHeightOffset = val end })
 
 RunService.Heartbeat:Connect(function()
     if _G.SmartDesyncState and localPlayer.Character then
         pcall(function()
-            local char = localPlayer.Character
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local tool = char:FindFirstChildOfClass("Tool")
-
+            local char = localPlayer.Character local root = char:FindFirstChild("HumanoidRootPart") local hum = char:FindFirstChildOfClass("Humanoid") local tool = char:FindFirstChildOfClass("Tool")
             if root and hum and hum.Health > 0 then
-                local realCF = root.CFrame
-                lastSafePos = realCF
-
-                root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-
-                if tool then
-                    for _, part in ipairs(tool:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                            part.Massless = true
-                        end
-                    end
-                end
-
-                local faceUpRotation = CFrame.Angles(math.rad(-90), 0, 0)
-                local fakeCF = (realCF * CFrame.new(0, getgenv().DesyncHeightOffset, 0)) * faceUpRotation
-
-                root.CFrame = fakeCF
-                hum.CameraOffset = fakeCF:ToObjectSpace(realCF).Position
-
-                RunService.RenderStepped:Wait()
-
-                if root and _G.SmartDesyncState then
-                    root.CFrame = realCF
-                end
+                local realCF = root.CFrame lastSafePos = realCF root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+                if tool then for _, part in ipairs(tool:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false part.Massless = true end end end
+                local fakeCF = (realCF * CFrame.new(0, getgenv().DesyncHeightOffset, 0)) * CFrame.Angles(math.rad(-90), 0, 0)
+                root.CFrame = fakeCF hum.CameraOffset = fakeCF:ToObjectSpace(realCF).Position RunService.RenderStepped:Wait()
+                if root and _G.SmartDesyncState then root.CFrame = realCF end
             end
         end)
     end
 end)
 
--- FAKE LAG SERVER
-local SectionFakeLag = Tabs.PvP:AddSection("Fake Lag Server (Chống Địch Đánh Trúng)")
-_G.SmoothFakeLag = false
-getgenv().LagPower = 0.35
-
-SectionFakeLag:AddToggle("SmoothLagToggle", {
-    Title = "Bật Fake Lag Server",
-    Default = false,
-    Callback = function(state) _G.SmoothFakeLag = state end
-})
-
-SectionFakeLag:AddSlider("LagPowerSlider", {
-    Title = "Mức Độ Giật Lag (Giây)",
-    Min = 0.1, Max = 0.8, Default = 0.35, Rounding = 2,
-    Callback = function(v) getgenv().LagPower = v end
-})
+local SectionFakeLag = Tabs.PvP:AddSection("Fake Lag Server")
+_G.SmoothFakeLag = false getgenv().LagPower = 0.35
+SectionFakeLag:AddToggle("SmoothLagToggle", { Title = "Bật Fake Lag Server", Default = false, Callback = function(state) _G.SmoothFakeLag = state end })
+SectionFakeLag:AddSlider("LagPowerSlider", { Title = "Mức Độ Giật Lag (Giây)", Min = 0.1, Max = 0.8, Default = 0.35, Rounding = 2, Callback = function(v) getgenv().LagPower = v end })
 
 task.spawn(function()
     local lastFakeTick = tick()
     RunService.Heartbeat:Connect(function()
         if _G.SmoothFakeLag and localPlayer.Character then
             local root = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                if tick() - lastFakeTick < getgenv().LagPower then
-                    pcall(function() sethiddenproperty(root, "NetworkIsSpawning", true) end)
-                else
-                    lastFakeTick = tick()
-                    pcall(function() sethiddenproperty(root, "NetworkIsSpawning", false) end)
-                end
-            end
-        else
-            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                pcall(function() sethiddenproperty(localPlayer.Character.HumanoidRootPart, "NetworkIsSpawning", false) end)
-            end
-        end
+            if root then if tick() - lastFakeTick < getgenv().LagPower then pcall(function() sethiddenproperty(root, "NetworkIsSpawning", true) end) else lastFakeTick = tick() pcall(function() sethiddenproperty(root, "NetworkIsSpawning", false) end) end end
+        else if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then pcall(function() sethiddenproperty(localPlayer.Character.HumanoidRootPart, "NetworkIsSpawning", false) end) end end
     end)
 end)
 
--- HITBOX VŨ KHÍ & AUTO ATTACK
 local SectionHitbox = Tabs.PvP:AddSection("Tùy Chỉnh Kích Thước Hitbox Vũ Khí")
 SectionHitbox:AddInput("BoxX", { Title = "Size X", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxX = tonumber(val) or 8 end })
 SectionHitbox:AddInput("BoxY", { Title = "Size Y", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxY = tonumber(val) or 8 end })
 SectionHitbox:AddInput("BoxZ", { Title = "Size Z", Default = "8", Numeric = true, Callback = function(val) getgenv().HitBoxZ = tonumber(val) or 8 end })
-
 SectionHitbox:AddButton({
     Title = "Phóng To Hitbox Vũ Khí",
     Callback = function()
         if localPlayer.Character then
             for _, tool in ipairs(localPlayer.Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    for _, p in ipairs(tool:GetDescendants()) do
-                        if p:IsA("BasePart") then
-                            p.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ)
-                            p.Massless = true
-                            p.CanCollide = false
-                        end
-                    end
-                end
+                if tool:IsA("Tool") then for _, p in ipairs(tool:GetDescendants()) do if p:IsA("BasePart") then p.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ) p.Massless = true p.CanCollide = false end end end
             end
             Fluent:Notify({ Title = "Hitbox Fixed", Content = "Đã phóng to kích thước đòn đánh!", Duration = 3 })
         end
@@ -629,25 +504,12 @@ SectionHitbox:AddButton({
 })
 
 local SectionFeatures = Tabs.PvP:AddSection("Chức Năng Hỗ Trợ Chiến Đấu")
-local autoToolState = false
-SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh Liên Tục", Default = false, Callback = function(state) autoToolState = state end })
-
-task.spawn(function()
-    while true do
-        task.wait(0.01)
-        if autoToolState and localPlayer.Character then
-            local tool = localPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then 
-                pcall(function() tool:Activate() end) 
-            end
-        end
-    end
-end)
+local autoToolState = false SectionFeatures:AddToggle("AutoTool", { Title = "Tự Động Đánh Liên Tục", Default = false, Callback = function(state) autoToolState = state end })
+task.spawn(function() while true do task.wait(0.01) if autoToolState and localPlayer.Character then local tool = localPlayer.Character:FindFirstChildOfClass("Tool") if tool and tool.Name ~= "Băng Gạc" and tool.Name ~= "Bandage" and tool.Name ~= "Medkit" then pcall(function() tool:Activate() end) end end end end)
 
 _G.HitboxPvP = false SectionFeatures:AddToggle("HitboxRed", { Title = "Mở Rộng Hitbox Địch (Hộp Đỏ MMB)", Default = false, Callback = function(state) _G.HitboxPvP = state end })
 _G.SpeedPvP = false SectionFeatures:AddToggle("BypassSpeed", { Title = "Bypass Speed Velocity (Anti-Kick)", Default = false, Callback = function(state) _G.SpeedPvP = state end })
-SectionFeatures:AddSlider("VelocitySpeedSlider", { Title = "Tốc độ Velocity", Min = 20, Max = 120, Default = 65, Rounding = 1, Callback = function(val) getgenv().BypassVelocitySpeed = val end })
-
+SectionFeatures:AddSlider("VelocitySpeedSlider", { Title = "Tốc độ Velocity", Min = 20, Max = 120, Default = 60, Rounding = 1, Callback = function(val) getgenv().BypassVelocitySpeed = val end })
 _G.AutoHeal = false SectionFeatures:AddToggle("AutoHeal", { Title = "Tự Động Băng Gạc (Hồi Ngầm)", Default = false, Callback = function(state) _G.AutoHeal = state end })
 
 task.spawn(function()
@@ -660,13 +522,10 @@ task.spawn(function()
                     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
                         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
                             local n = obj.Name:lower()
-                            if n:match("heal") or n:match("gac") or n:match("bang") or n:match("band") or n:match("med") or n:match("use") or n:match("item") then
-                                if obj:IsA("RemoteEvent") then obj:FireServer("Băng Gạc") obj:FireServer() else obj:InvokeServer("Băng Gạc") obj:InvokeServer() end
-                            end
+                            if n:match("heal") or n:match("gac") or n:match("bang") or n:match("band") or n:match("med") or n:match("use") or n:match("item") then if obj:IsA("RemoteEvent") then obj:FireServer("Băng Gạc") obj:FireServer() else obj:InvokeServer("Băng Gạc") obj:InvokeServer() end end
                         end
                     end
-                    local toolGac = localPlayer.Backpack:FindFirstChild("Băng Gạc") or localPlayer.Backpack:FindFirstChild("Bandage") or localPlayer.Backpack:FindFirstChild("Medkit")
-                    if toolGac then toolGac:Activate() end
+                    local toolGac = localPlayer.Backpack:FindFirstChild("Băng Gạc") or localPlayer.Backpack:FindFirstChild("Bandage") or localPlayer.Backpack:FindFirstChild("Medkit") if toolGac then toolGac:Activate() end
                 end)
             end
         end
@@ -682,27 +541,78 @@ SectionFeatures:AddToggle("PvPSpin", {
         if state then
             if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = false end
             spinConnection = RunService.Heartbeat:Connect(function() local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") if root then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0) end end)
-        else
-            if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = true end
-        end
+        else if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then localPlayer.Character.Humanoid.AutoRotate = true end end
     end
 })
 
-local SectionAim = Tabs.PvP:AddSection("Hệ Thống Khóa Mục Tiêu")
+-- ============================================================================
+-- 📡 HỆ THỐNG RADAR TỰ ĐỘNG CẢI TIẾN
+-- ============================================================================
+local SectionAim = Tabs.PvP:AddSection("Hệ Thống Radar Quét Vũ Khí & Mode Bay")
 _G.AimlockPvP = false SectionAim:AddToggle("AimlockMMB", { Title = "Aimlock Theo Bán Kính", Default = false, Callback = function(state) _G.AimlockPvP = state end })
 
 local aimPlayerState = false local currentTargetName = "None" local aimConnection
-local TargetButton = SectionAim:AddButton({
-    Title = "Chọn Mục Tiêu Chỉ Định", Description = "Mục tiêu hiện tại: None",
-    Callback = function()
-        local playerList = {}
-        for _, p in ipairs(Players:GetPlayers()) do if p ~= localPlayer then table.insert(playerList, p.Name) end end
-        if #playerList == 0 then Fluent:Notify({ Title = "Thông báo", Content = "Không tìm thấy ai!", Duration = 3 }) return end
-        local options = {}
-        for _, name in ipairs(playerList) do table.insert(options, { Text = name, Callback = function() currentTargetName = name TargetButton:SetDesc("Mục tiêu hiện tại: " .. name) end }) end
-        Window:Dialog({ Title = "Hệ thống Target", Content = "Chọn người chơi:", Buttons = options })
-    end
+local isTargetValidWeapon = false 
+
+local RadarStatusLabel = SectionAim:AddParagraph({
+    Title = "[Radar Scan] Đang tìm mục tiêu...",
+    Content = "Chưa phát hiện ai ở gần."
 })
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        local now = tick()
+        local localChar = localPlayer.Character
+        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character then
+                local holdsWeapon = false
+                for _, item in ipairs(p.Character:GetChildren()) do
+                    if item:IsA("Tool") and item.Name ~= "Băng Gạc" and item.Name ~= "Bandage" and item.Name ~= "Medkit" and item.Name ~= "GrabBox" then
+                        holdsWeapon = true
+                        break
+                    end
+                end
+                if holdsWeapon then weaponHistory[p.Name] = now end
+            end
+        end
+        
+        local bestTarget = nil
+        local closestDist = math.huge
+        
+        if localRoot then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 1 then
+                        local dist = (localRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        local lastSeenWeaponTime = weaponHistory[p.Name] or 0
+                        if now - lastSeenWeaponTime <= 30 then
+                            if dist < closestDist then
+                                closestDist = dist
+                                bestTarget = p.Name
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if bestTarget then
+            currentTargetName = bestTarget
+            isTargetValidWeapon = true
+            RadarStatusLabel:SetTitle("[Radar] Khóa Target: " .. bestTarget)
+            RadarStatusLabel:SetDesc("Đang cầm vũ khí hoặc cất chưa quá 30 giây. Khoảng cách: " .. math.floor(closestDist) .. " studs")
+        else
+            currentTargetName = "None"
+            isTargetValidWeapon = false
+            RadarStatusLabel:SetTitle("[Radar Safe Mode] Đang Đợi Địch Cầm Vũ Khí...")
+            RadarStatusLabel:SetDesc("Không có ai cầm vũ khí trong tầm kiểm soát. Chế độ bay tạm khóa để tránh lỗi.")
+        end
+    end
+end)
 
 SectionAim:AddToggle("AimPlayerXenox", {
     Title = "Khóa Tâm Nhìn (Target)", Default = false,
@@ -710,7 +620,7 @@ SectionAim:AddToggle("AimPlayerXenox", {
         aimPlayerState = state if aimConnection then aimConnection:Disconnect() end
         if state then
             aimConnection = RunService.RenderStepped:Connect(function()
-                if currentTargetName ~= "None" and localPlayer.Character then
+                if currentTargetName ~= "None" and localPlayer.Character and not _G.FlyOrbitAround and not _G.FlyTopDown then
                     local target = Players:FindFirstChild(currentTargetName) local localRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
                     if target and target.Character and target.Character:FindFirstChild("Head") and localRoot then
                         local head = target.Character.Head localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(head.Position.X, localRoot.Position.Y, head.Position.Z))
@@ -721,16 +631,91 @@ SectionAim:AddToggle("AimPlayerXenox", {
     end
 })
 
+_G.FlyTopDown = false
+getgenv().TopDownHeight = 12.5
+
+local TopDownToggle = SectionAim:AddToggle("FlyTopDownToggle", { 
+    Title = "1. Bay Trên Đầu & Aim Xuống", 
+    Default = false, 
+    Callback = function(state) 
+        _G.FlyTopDown = state 
+        if state and _G.FlyOrbitAround then
+            _G.FlyOrbitAround = false
+            Fluent:Notify({ Title = "Mode Switch", Content = "Đã tắt Bay Vòng Quanh để ưu tiên Bay Trên Đầu!", Duration = 2 })
+        end
+    end 
+})
+SectionAim:AddSlider("TopDownHeightSlider", { Title = "Độ Cao Bay Trên Đầu", Min = 3, Max = 25, Default = 12.5, Rounding = 1, Callback = function(v) getgenv().TopDownHeight = v end })
+
+_G.FlyOrbitAround = false
+getgenv().OrbitRadius = 6
+getgenv().OrbitHeight = 0
+getgenv().OrbitSpeed = 67 
+
+local OrbitToggle = SectionAim:AddToggle("FlyOrbitToggle", { 
+    Title = "2. Bay Vòng Quanh Target", 
+    Default = false, 
+    Callback = function(state) 
+        _G.FlyOrbitAround = state 
+        if state and _G.FlyTopDown then
+            _G.FlyTopDown = false
+            Fluent:Notify({ Title = "Mode Switch", Content = "Đã tắt Bay Trên Đầu để ưu tiên Bay Vòng Quanh!", Duration = 2 })
+        end
+    end 
+})
+SectionAim:AddSlider("OrbitRadiusSlider", { Title = "Bán Kính / Khoảng Cách Vòng Xoay", Min = 2, Max = 20, Default = 6, Rounding = 1, Callback = function(v) getgenv().OrbitRadius = v end })
+SectionAim:AddSlider("OrbitSpeedSlider", { Title = "Tốc Độ Bay Xoay Vòng", Min = 1, Max = 150, Default = 67, Rounding = 1, Callback = function(v) getgenv().OrbitSpeed = v end })
+SectionAim:AddSlider("OrbitHeightSlider", { Title = "Độ Cao Bay Xoay (0 = Ngang Người)", Min = -10, Max = 20, Default = 0, Rounding = 1, Callback = function(v) getgenv().OrbitHeight = v end })
+
+local orbitAngle = 0
+RunService.Heartbeat:Connect(function()
+    if (_G.FlyTopDown or _G.FlyOrbitAround) and currentTargetName ~= "None" and isTargetValidWeapon then
+        pcall(function()
+            local target = Players:FindFirstChild(currentTargetName)
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if root and hum and hum.Health > 1 and target and target.Character then
+                local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                local targetHum = target.Character:FindFirstChildOfClass("Humanoid")
+                
+                if targetRoot and targetHum and targetHum.Health > 1 then
+                    local targetRootPos = targetRoot.Position
+                    
+                    for _, p in ipairs(char:GetChildren()) do 
+                        if p:IsA("BasePart") then p.CanCollide = false end 
+                    end
+                    
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                    
+                    if _G.FlyTopDown then
+                        local topPos = targetRootPos + Vector3.new(0, getgenv().TopDownHeight, 0)
+                        root.CFrame = CFrame.lookAt(topPos, targetRootPos)
+                    elseif _G.FlyOrbitAround then
+                        orbitAngle = orbitAngle + math.rad(getgenv().OrbitSpeed * 0.5)
+                        local offsetX = math.cos(orbitAngle) * getgenv().OrbitRadius
+                        local offsetZ = math.sin(orbitAngle) * getgenv().OrbitRadius
+                        
+                        local orbitPos = targetRootPos + Vector3.new(offsetX, getgenv().OrbitHeight, offsetZ)
+                        root.CFrame = CFrame.lookAt(orbitPos, targetRootPos)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ============================================================================
+-- HỆ THỐNG ĐỊNH VỊ (ESP) TRỰC QUAN CHỈNH SỬA
+-- ============================================================================
 local function getClosestPlayer()
-    local closestPlayer = nil local shortestDistance = AIMLOCK_RADIUS
-    local localChar = localPlayer.Character local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+    local closestPlayer = nil local shortestDistance = AIMLOCK_RADIUS local localChar = localPlayer.Character local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
     if not localRoot then return nil end
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-            if p.Character.Humanoid.Health > 0 then
-                local distance = (localRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                if distance < shortestDistance then shortestDistance = distance closestPlayer = p end
-            end
+            if p.Character.Humanoid.Health > 0 then local distance = (localRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude if distance < shortestDistance then shortestDistance = distance closestPlayer = p end end
         end
     end
     return closestPlayer
@@ -739,20 +724,75 @@ end
 local function createPlayerESP(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
     local root = targetPlayer.Character.HumanoidRootPart
+    
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "NameESP_" .. targetPlayer.Name billboard.Size = UDim2.new(0, 150, 0, 35) billboard.Adornee = root billboard.AlwaysOnTop = true billboard.MaxDistance = 2000 billboard.Parent = folderESP
+    billboard.Name = "NameESP_" .. targetPlayer.Name
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.Adornee = root
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 2000
+    billboard.Parent = folderESP
+
     local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.fromScale(1, 1) label.BackgroundTransparency = 0.5 label.BackgroundColor3 = Color3.new(0, 0, 0) label.Text = targetPlayer.Name label.TextColor3 = Color3.new(1, 0, 0) label.TextScaled = true label.Font = Enum.Font.SourceSansBold
-    local line = Drawing.new("Line") line.Visible = true line.Color = Color3.new(1, 0, 0) line.Thickness = 2
+    label.Size = UDim2.new(1, 0, 0.5, 0)
+    label.BackgroundTransparency = 0.5
+    label.BackgroundColor3 = Color3.new(0, 0, 0)
+    label.Text = targetPlayer.Name
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+
+    local keyLabel = Instance.new("TextLabel", billboard)
+    keyLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    keyLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    keyLabel.BackgroundTransparency = 1
+    keyLabel.TextScaled = true
+    keyLabel.Font = Enum.Font.SourceSansBold
+    keyLabel.Text = ""
+
+    local line = Drawing.new("Line")
+    line.Visible = true
+    line.Thickness = 2
+
     local connection
     connection = RunService.RenderStepped:Connect(function()
-        if not _G.ESPToggleState or not targetPlayer.Parent or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            line.Visible = false line:Delete() billboard:Destroy() connection:Disconnect() return
+        if not _G.ESPToggleState or not targetPlayer.Parent or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then 
+            line.Visible = false 
+            line:Delete() 
+            billboard:Destroy() 
+            connection:Disconnect() 
+            return 
         end
-        local cam = workspace.CurrentCamera
-        local targetPos, onScreen1 = cam:WorldToViewportPoint(root.Position)
+        
+        local cam = workspace.CurrentCamera 
+        local targetPos, onScreen1 = cam:WorldToViewportPoint(root.Position) 
         local localPos, onScreen2 = cam:WorldToViewportPoint(localPlayer.Character.HumanoidRootPart.Position)
-        if onScreen1 and onScreen2 then line.From = Vector2.new(localPos.X, localPos.Y) line.To = Vector2.new(targetPos.X, targetPos.Y) line.Visible = true billboard.Enabled = true else line.Visible = false billboard.Enabled = false end
+
+        if _G.KeyCheckESPState then
+            local keyData = getgenv().KeySystemDatabase[targetPlayer.Name] or getgenv().KeySystemDatabase[string.lower(targetPlayer.Name)]
+            if keyData then 
+                keyLabel.Text = "[🔑 KEY VIP: " .. keyData.Role .. "]" 
+                keyLabel.TextColor3 = Color3.fromRGB(0, 255, 0) 
+                line.Color = Color3.fromRGB(0, 255, 0)
+            else 
+                keyLabel.Text = "[❌ NO KEY]" 
+                keyLabel.TextColor3 = Color3.fromRGB(200, 200, 200) 
+                line.Color = Color3.fromRGB(255, 0, 0) 
+            end
+        else 
+            keyLabel.Text = "" 
+            line.Color = Color3.fromRGB(255, 255, 255) 
+        end
+
+        if onScreen1 and onScreen2 then 
+            line.From = Vector2.new(localPos.X, localPos.Y) 
+            line.To = Vector2.new(targetPos.X, targetPos.Y) 
+            line.Visible = true 
+            billboard.Enabled = true 
+        else 
+            line.Visible = false 
+            billboard.Enabled = false 
+        end
     end)
 end
 
@@ -779,50 +819,35 @@ RunService.Heartbeat:Connect(function()
     if not char or not root or not hum then return end
     
     if _G.SpeedPvP then
-        if hum.MoveDirection.Magnitude > 0 then
-            local targetVelocity = hum.MoveDirection * getgenv().BypassVelocitySpeed
-            root.AssemblyLinearVelocity = Vector3.new(targetVelocity.X, root.AssemblyLinearVelocity.Y, targetVelocity.Z)
-        else root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        if hum.MoveDirection.Magnitude > 0 then local targetVelocity = hum.MoveDirection * getgenv().BypassVelocitySpeed root.AssemblyLinearVelocity = Vector3.new(targetVelocity.X, root.AssemblyLinearVelocity.Y, targetVelocity.Z) else root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
     end
     
-    if _G.AimlockPvP and not aimPlayerState then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = target.Character.HumanoidRootPart.Position
-            root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
-        end
+    if (_G.FlyTopDown or _G.FlyOrbitAround) and isTargetValidWeapon then
+        root.AssemblyLinearVelocity = Vector3.zero
     end
     
+    if _G.AimlockPvP and not aimPlayerState and not _G.FlyOrbitAround and not _G.FlyTopDown then
+        local target = getClosestPlayer() if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then local targetPos = target.Character.HumanoidRootPart.Position root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z)) end
+    end
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= localPlayer and p.Character then
             local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
             if targetRoot then
-                if _G.HitboxPvP then
-                    targetRoot.Size = HITBOX_SIZE_RED targetRoot.Transparency = 0.75 targetRoot.Color = Color3.fromRGB(244, 63, 94) targetRoot.CanCollide = true
-                else
-                    if targetRoot.Size == HITBOX_SIZE_RED then targetRoot.Size = Vector3.new(2, 2, 1) targetRoot.Transparency = 1 targetRoot.CanCollide = true end
-                end
+                if _G.HitboxPvP then targetRoot.Size = HITBOX_SIZE_RED targetRoot.Transparency = 0.75 targetRoot.Color = Color3.fromRGB(244, 63, 94) targetRoot.CanCollide = true else if targetRoot.Size == HITBOX_SIZE_RED then targetRoot.Size = Vector3.new(2, 2, 1) targetRoot.Transparency = 1 targetRoot.CanCollide = true end end
             end
             if toolHitboxESPState then
                 for _, child in ipairs(p.Character:GetChildren()) do
                     if child:IsA("Tool") then
                         local handle = child:FindFirstChild("Handle") or child:FindFirstChild("Hitbox")
-                        if handle and not toolBoxes[child] then
-                            local sBox = Instance.new("SelectionBox", handle)
-                            sBox.Name = "GlobalToolHitbox" sBox.Adornee = handle sBox.LineThickness = 0.04 sBox.Color3 = Color3.fromRGB(0, 255, 0) sBox.SurfaceTransparency = 0.9
-                            toolBoxes[child] = sBox
-                        end
+                        if handle and not toolBoxes[child] then local sBox = Instance.new("SelectionBox", handle) sBox.Name = "GlobalToolHitbox" sBox.Adornee = handle sBox.LineThickness = 0.04 sBox.Color3 = Color3.fromRGB(0, 255, 0) sBox.SurfaceTransparency = 0.9 toolBoxes[child] = sBox end
                     end
                 end
             end
             if healthESPState then
-                applyHealthESP(p.Character)
-                local tHum = p.Character:FindFirstChildOfClass("Humanoid") local tHead = p.Character:FindFirstChild("Head")
+                applyHealthESP(p.Character) local tHum = p.Character:FindFirstChildOfClass("Humanoid") local tHead = p.Character:FindFirstChild("Head")
                 if tHum and tHead and tHead:FindFirstChild("HealthESP") then
                     local esp = tHead.HealthESP local bar = esp.Frame.HealthBar local percentage = math.clamp(tHum.Health / tHum.MaxHealth, 0, 1)
-                    bar.Size = UDim2.new(percentage, 0, 1, 0)
-                    bar.BackgroundColor3 = percentage > 0.6 and Color3.fromRGB(0, 255, 0) or (percentage > 0.3 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0))
-                    esp.HPText.Text = math.floor(tHum.Health) .. "/" .. math.floor(tHum.MaxHealth)
+                    bar.Size = UDim2.new(percentage, 0, 1, 0) bar.BackgroundColor3 = percentage > 0.6 and Color3.fromRGB(0, 255, 0) or (percentage > 0.3 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0)) esp.HPText.Text = math.floor(tHum.Health) .. "/" .. math.floor(tHum.MaxHealth)
                 end
             end
         end
@@ -834,7 +859,4 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- TAB MẶC ĐỊNH
-Tabs.Farm:Select()
-
-task.wait(0.5)
-Fluent:Notify({ Title = "MEMAYBEO HUB V31.5", Content = "Đã tự động ẩn menu. Chạm 3 ngón tay 3 lần liên tục để Mở!", Duration = 5 })
+Tabs.Profile:Select()
