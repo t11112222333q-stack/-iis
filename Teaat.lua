@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Fixed White Screen & Toggle System)
+	Made by Late (Fixed SetTheme & Colors Edition)
 ]]
 
 --// Connections
@@ -316,7 +316,6 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		end
 	end
 
-	-- HÀM TOGGLE AN TOÀN CHO NÚT MOBILE TRUY XUẤT
 	function Options:Toggle()
 		Close()
 	end
@@ -717,13 +716,34 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		}
 	end
 
-	-- AN TOÀN SETTHEME KHÔNG BIẾN THÀNH MÀU TRẮNG XUẤT HIỆN LỖI FLASHBANG
+	-- CẬP NHẬT DỰA VÀO CÁC MẢNG THUỘC TÍNH
 	function Options:SetTheme(Info)
 		Theme = Info or Theme
+
 		Window.BackgroundColor3 = Theme.Primary
 		Holder.BackgroundColor3 = Theme.Secondary
+		
 		local stroke = Window:FindFirstChildOfClass("UIStroke")
 		if stroke then stroke.Color = Theme.Shadow end
+
+		-- Đổi màu trực tiếp các phần tử UI con
+		for _, v in pairs(Window:GetDescendants()) do
+			pcall(function()
+				if v:IsA("TextLabel") then
+					if v.Name == "Title" then
+						v.TextColor3 = Theme.Title
+					elseif v.Name == "Description" or v.Name == "TextLabel" then
+						v.TextColor3 = Theme.Description
+					end
+				elseif v:IsA("Frame") or v:IsA("TextButton") then
+					if v.Name == "Main" or v.Name == "Button" or v.Name == "Toggle" or v.Name == "Slider" then
+						v.BackgroundColor3 = Theme.Component
+					end
+				elseif v:IsA("ImageLabel") then
+					v.ImageColor3 = Theme.Icon
+				end
+			end)
+		end
 	end
 
 	function Options:SetSetting(Setting, Value)
