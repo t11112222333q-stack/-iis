@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Fixed SetTheme Dynamic Colors & Mobile Toggle Edition)
+	Made by Late (Fixed Dynamic SetTheme & Full Toggle Support)
 ]]
 
 --// Connections
@@ -316,6 +316,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		end
 	end
 
+	-- XUẤT HÀM TOGGLE HOÀN CHỈNH CHO MOBILE BUTTON GỌI
 	function Options:Toggle()
 		Close()
 	end
@@ -716,7 +717,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		}
 	end
 
-	-- HÀM ĐỔI THEME DYNAMIC MỚI TỰ ĐỘNG QUÉT VÀ ÉP ĐỔI MÀU REALTIME
+	-- HÀM ÉP CẬP NHẬT MÀU DYNAMIC REALTIME CHO TOÀN BỘ WINDOW BẢN SỬA LỖI
 	function Options:SetTheme(Info)
 		Theme = Info or Theme
 
@@ -728,8 +729,8 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 			local stroke = Window:FindFirstChildOfClass("UIStroke")
 			if stroke then stroke.Color = Theme.Shadow end
 
-			-- Quét sạch mọi nút/khung/nhãn chữ được khởi tạo động
-			for _, v in pairs(Screen:GetDescendants()) do
+			-- Lặp cập nhật màu cho toàn bộ các UI con
+			for _, v in pairs(Window:GetDescendants()) do
 				pcall(function()
 					if v:IsA("TextLabel") then
 						if v.Name == "Title" or v.Name == "Section" or v.Name == "TextLabel" then
