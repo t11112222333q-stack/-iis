@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Fixed Dynamic SetTheme & Color Engine Edition)
+	Made by Late (Fixed SetTheme Dynamic Colors & Mobile Toggle Edition)
 ]]
 
 --// Connections
@@ -716,7 +716,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		}
 	end
 
-	-- HÀM CẬP NHẬT MÀU DYNAMIC ĐÃ DỌN ĐẸP TOÀN BỘ CÁC CHI TIẾT
+	-- HÀM ĐỔI THEME DYNAMIC MỚI TỰ ĐỘNG QUÉT VÀ ÉP ĐỔI MÀU REALTIME
 	function Options:SetTheme(Info)
 		Theme = Info or Theme
 
@@ -728,6 +728,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 			local stroke = Window:FindFirstChildOfClass("UIStroke")
 			if stroke then stroke.Color = Theme.Shadow end
 
+			-- Quét sạch mọi nút/khung/nhãn chữ được khởi tạo động
 			for _, v in pairs(Screen:GetDescendants()) do
 				pcall(function()
 					if v:IsA("TextLabel") then
