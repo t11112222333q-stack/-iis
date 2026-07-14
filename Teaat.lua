@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Fixed Toggle & Optimization Edition)
+	Made by Late (Fixed White Screen & Toggle System)
 ]]
 
 --// Connections
@@ -18,32 +18,26 @@ end
 --// Important 
 local Setup = {
 	Keybind = Enum.KeyCode.RightControl,
-	Transparency = 0.2,
+	Transparency = 0,
 	ThemeMode = "Dark",
 	Size = nil,
 }
 
-local Theme = { --// (Dark Theme)
-	--// Frames:
+local Theme = { --// (Dark Theme Default)
 	Primary = Color3.fromRGB(30, 30, 30),
 	Secondary = Color3.fromRGB(35, 35, 35),
 	Component = Color3.fromRGB(40, 40, 40),
 	Interactables = Color3.fromRGB(45, 45, 45),
 
-	--// Text:
 	Tab = Color3.fromRGB(200, 200, 200),
-	Title = Color3.fromRGB(240,240,240),
-	Description = Color3.fromRGB(200,200,200),
+	Title = Color3.fromRGB(240, 240, 240),
+	Description = Color3.fromRGB(160, 160, 160),
 
-	--// Outlines:
 	Shadow = Color3.fromRGB(0, 0, 0),
 	Outline = Color3.fromRGB(40, 40, 40),
-
-	--// Image:
 	Icon = Color3.fromRGB(220, 220, 220),
 }
 
---// Services & Functions
 local Type, Blur = nil
 local LocalPlayer = GetService(game, "Players").LocalPlayer;
 local Services = {
@@ -59,6 +53,7 @@ local Player = {
 }
 
 local Tween = function(Object : Instance, Speed : number, Properties : {}, Info : { EasingStyle: Enum?, EasingDirection: Enum? })
+	if not Object then return end
 	local Style, Direction
 	if Info then
 		Style, Direction = Info["EasingStyle"], Info["EasingDirection"]
@@ -69,8 +64,9 @@ local Tween = function(Object : Instance, Speed : number, Properties : {}, Info 
 end
 
 local SetProperty = function(Object: Instance, Properties: {})
+	if not Object then return end
 	for Index, Property in next, Properties do
-		Object[Index] = Property;
+		pcall(function() Object[Index] = Property end)
 	end
 	return Object
 end
@@ -85,12 +81,12 @@ local Multiply = function(Value, Amount)
 	return UDim2.new(unpack(New))
 end
 
-local Color = function(Color, Factor, Mode)
+local Color = function(ColorVal, Factor, Mode)
 	Mode = Mode or Setup.ThemeMode
 	if Mode == "Light" then
-		return Color3.fromRGB((Color.R * 255) - Factor, (Color.G * 255) - Factor, (Color.B * 255) - Factor)
+		return Color3.fromRGB((ColorVal.R * 255) - Factor, (ColorVal.G * 255) - Factor, (ColorVal.B * 255) - Factor)
 	else
-		return Color3.fromRGB((Color.R * 255) + Factor, (Color.G * 255) + Factor, (Color.B * 255) + Factor)
+		return Color3.fromRGB((ColorVal.R * 255) + Factor, (ColorVal.G * 255) + Factor, (ColorVal.B * 255) + Factor)
 	end
 end
 
@@ -225,55 +221,44 @@ local StoredInfo = {
 
 --// Animations [Window]
 function Animations:Open(Window: CanvasGroup, Transparency: number, UseCurrentSize: boolean)
-	local Original = (UseCurrentSize and Window.Size) or Setup.Size
-	local Multiplied = Multiply(Original, 1.1)
+	if not Window then return end
+	local Original = (UseCurrentSize and Window.Size) or Setup.Size or UDim2.fromOffset(580, 440)
 	local Shadow = Window:FindFirstChildOfClass("UIStroke")
 
-	if Shadow then SetProperty(Shadow, { Transparency = 1 }) end
+	if Shadow then SetProperty(Shadow, { Transparency = 0.5 }) end
 	SetProperty(Window, {
-		Size = Multiplied,
-		GroupTransparency = 1,
-		Visible = true,
-	})
-
-	if Shadow then Tween(Shadow, .25, { Transparency = 0.5 }) end
-	Tween(Window, .25, {
 		Size = Original,
 		GroupTransparency = Transparency or 0,
+		Visible = true,
 	})
 end
 
 function Animations:Close(Window: CanvasGroup)
-	local Original = Window.Size
-	local Multiplied = Multiply(Original, 1.1)
+	if not Window then return end
 	local Shadow = Window:FindFirstChildOfClass("UIStroke")
 
-	SetProperty(Window, { Size = Original })
-	if Shadow then Tween(Shadow, .25, { Transparency = 1 }) end
-	Tween(Window, .25, {
-		Size = Multiplied,
-		GroupTransparency = 1,
-	})
+	if Shadow then Tween(Shadow, .15, { Transparency = 1 }) end
+	Tween(Window, .15, { GroupTransparency = 1 })
 
-	task.wait(.25)
-	Window.Size = Original
+	task.wait(.15)
 	Window.Visible = false
 end
 
 function Animations:Component(Component: any, Custom: boolean)	
+	if not Component then return end
 	Component.InputBegan:Connect(function() 
 		if Custom then
-			Tween(Component, .25, { Transparency = .85 });
+			Tween(Component, .15, { Transparency = .85 });
 		else
-			Tween(Component, .25, { BackgroundColor3 = Color(Theme.Component, 5, Setup.ThemeMode) });
+			Tween(Component, .15, { BackgroundColor3 = Color(Theme.Component, 5, Setup.ThemeMode) });
 		end
 	end)
 
 	Component.InputEnded:Connect(function() 
 		if Custom then
-			Tween(Component, .25, { Transparency = 1 });
+			Tween(Component, .15, { Transparency = 1 });
 		else
-			Tween(Component, .25, { BackgroundColor3 = Theme.Component });
+			Tween(Component, .15, { BackgroundColor3 = Theme.Component });
 		end
 	end)
 end
@@ -301,7 +286,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 	Drag(Window);
 	Resizeable(Window, Vector2.new(411, 271), Vector2.new(9e9, 9e9));
 	Setup.Transparency = Settings.Transparency or 0
-	Setup.Size = Settings.Size
+	Setup.Size = Settings.Size or UDim2.fromOffset(580, 440)
 	Setup.ThemeMode = Settings.Theme or "Dark"
 
 	if Settings.Blurring and Blur then
@@ -317,7 +302,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 	local Close = function()
 		if Opened then
-			if BlurEnabled and Blurs[Settings.Title] then
+			if BlurEnabled and Blurs[Settings.Title] and Blurs[Settings.Title].root then
 				Blurs[Settings.Title].root.Parent = nil
 			end
 			Opened = false
@@ -325,13 +310,13 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		else
 			Animations:Open(Window, Setup.Transparency)
 			Opened = true
-			if BlurEnabled and Blurs[Settings.Title] then
+			if BlurEnabled and Blurs[Settings.Title] and Blurs[Settings.Title].root then
 				Blurs[Settings.Title].root.Parent = workspace.CurrentCamera
 			end
 		end
 	end
 
-	-- BỔ SUNG CÁC HÀM TOGGLE AN TOÀN CHO NÚT MOBILE TRUY XUẤT
+	-- HÀM TOGGLE AN TOÀN CHO NÚT MOBILE TRUY XUẤT
 	function Options:Toggle()
 		Close()
 	end
@@ -348,7 +333,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 			Animations:Component(Button, true)
 
 			Button.MouseButton1Click:Connect(function() 
-				if Name == "Close" then
+				if Name == "Close" or Name == "Minimize" then
 					Close()
 				elseif Name == "Maximize" then
 					if Maximized then
@@ -358,8 +343,6 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 						Maximized = true
 						Tween(Window, .15, { Size = UDim2.fromScale(1, 1), Position = UDim2.fromScale(0.5, 0.5 )});
 					end
-				elseif Name == "Minimize" then
-					Close()
 				end
 			end)
 		end
@@ -378,11 +361,11 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 				local Padding = Button:FindFirstChildOfClass("UIPadding");
 
 				if SameName and not OpenedVal.Value then
-					Tween(Padding, .25, { PaddingLeft = UDim.new(0, 25) });
+					if Padding then Tween(Padding, .25, { PaddingLeft = UDim.new(0, 25) }); end
 					Tween(Button, .25, { BackgroundTransparency = 0.9, Size = UDim2.new(1, -15, 0, 30) });
 					SetProperty(OpenedVal, { Value = true });
 				elseif not SameName and OpenedVal.Value then
-					Tween(Padding, .25, { PaddingLeft = UDim.new(0, 20) });
+					if Padding then Tween(Padding, .25, { PaddingLeft = UDim.new(0, 20) }); end
 					Tween(Button, .25, { BackgroundTransparency = 1, Size = UDim2.new(1, -44, 0, 30) });
 					SetProperty(OpenedVal, { Value = false });
 				end
@@ -417,6 +400,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 	function Options:AddTabSection(Settings: { Name: string, Order: number })
 		local Example = Examples["SectionExample"];
+		if not Example then return end
 		local Section = Clone(Example);
 
 		StoredInfo["Sections"][Settings.Name] = (Settings.Order);
@@ -481,7 +465,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		task.spawn(function() 
 			local Duration = Settings.Duration or 2
 			Animations:Open(Notification, Setup.Transparency, true); 
-			Tween(Timer, Duration, { Size = UDim2.new(0, 0, 0, 4) });
+			if Timer then Tween(Timer, Duration, { Size = UDim2.new(0, 0, 0, 4) }); end
 			task.wait(Duration);
 			Animations:Close(Notification);
 			task.wait(0.3);
@@ -491,7 +475,10 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 	function Options:GetLabels(Component)
 		local Labels = Component:FindFirstChild("Labels")
-		return Labels.Title, Labels.Description
+		if Labels then
+			return Labels:FindFirstChild("Title"), Labels:FindFirstChild("Description")
+		end
+		return Component, Component
 	end
 
 	function Options:AddSection(Settings: { Name: string, Tab: Instance }) 
@@ -521,15 +508,17 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 	function Options:AddInput(Settings: { Title: string, Description: string, Tab: Instance, Callback: any }) 
 		local Input = Clone(Components["Input"]);
 		local Title, Description = Options:GetLabels(Input);
-		local TextBox = Input["Main"]["Input"];
+		local TextBox = Input:FindFirstChild("Main") and Input.Main:FindFirstChild("Input");
 
 		Input.MouseButton1Click:Connect(function() 
-			TextBox:CaptureFocus()
+			if TextBox then TextBox:CaptureFocus() end
 		end)
 
-		TextBox.FocusLost:Connect(function() 
-			if Settings.Callback then Settings.Callback(TextBox.Text) end
-		end)
+		if TextBox then
+			TextBox.FocusLost:Connect(function() 
+				if Settings.Callback then Settings.Callback(TextBox.Text) end
+			end)
+		end
 
 		Animations:Component(Input)
 		SetProperty(Title, { Text = Settings.Title });
@@ -580,11 +569,11 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 	function Options:AddDropdown(Settings: { Title: string, Description: string, Options: {}, Tab: Instance, Callback: any }) 
 		local Dropdown = Clone(Components["Dropdown"]);
 		local Title, Description = Options:GetLabels(Dropdown);
-		local Text = Dropdown["Main"].Options;
+		local Text = Dropdown:FindFirstChild("Main") and Dropdown.Main:FindFirstChild("Options");
 
 		Dropdown.MouseButton1Click:Connect(function()
 			local Example = Clone(Examples["DropdownExample"]);
-			local Buttons = Example["Top"]["Buttons"];
+			local Buttons = Example:FindFirstChild("Top") and Example.Top:FindFirstChild("Buttons");
 
 			Tween(BG, .25, { BackgroundTransparency = 0.6 });
 			SetProperty(Example, { Parent = Window });
@@ -597,10 +586,12 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 				Example:Destroy();
 			end
 
-			for Index, Button in next, Buttons:GetChildren() do
-				if Button:IsA("TextButton") then
-					Animations:Component(Button, true)
-					Button.MouseButton1Click:Connect(CloseDropdown)
+			if Buttons then
+				for Index, Button in next, Buttons:GetChildren() do
+					if Button:IsA("TextButton") then
+						Animations:Component(Button, true)
+						Button.MouseButton1Click:Connect(CloseDropdown)
+					end
 				end
 			end
 
@@ -619,7 +610,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 					if NewValue then
 						Tween(Button, .25, { BackgroundColor3 = Theme.Interactables });
 						if Settings.Callback then Settings.Callback(Option) end
-						Text.Text = Index
+						if Text then Text.Text = Index end
 					end
 					Selected.Value = NewValue
 					CloseDropdown()
@@ -642,7 +633,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		local Title, Description = Options:GetLabels(Slider);
 
 		local Main = Slider["Slider"];
-		local Amount = Main["Main"].Input;
+		local Amount = Main:FindFirstChild("Main") and Main.Main:FindFirstChild("Input");
 		local Slide = Main["Slide"];
 		local Fire = Slide["Fire"];
 		local Fill = Slide["Highlight"];
@@ -669,14 +660,16 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 			end
 			
 			Value = SetNumber(Number or (Scale * Settings.MaxValue))
-			Amount.Text = tostring(Value)
+			if Amount then Amount.Text = tostring(Value) end
 			Fill.Size = UDim2.fromScale((Number and Number / Settings.MaxValue) or Scale, 1)
 			if Settings.Callback then Settings.Callback(Value) end
 		end
 
-		Amount.FocusLost:Connect(function() 
-			Update(tonumber(Amount.Text) or 0)
-		end)
+		if Amount then
+			Amount.FocusLost:Connect(function() 
+				Update(tonumber(Amount.Text) or 0)
+			end)
+		end
 
 		Fire.MouseButton1Down:Connect(function()
 			Active = true
@@ -716,15 +709,38 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 		return {
 			SetDescription = function(self, newText)
-				Description.Text = tostring(newText)
+				if Description then Description.Text = tostring(newText) end
 			end,
 			SetTitle = function(self, newText)
-				Title.Text = tostring(newText)
+				if Title then Title.Text = tostring(newText) end
 			end
 		}
 	end
 
-	SetProperty(Window, { Size = Settings.Size, Visible = true, Parent = Screen });
+	-- AN TOÀN SETTHEME KHÔNG BIẾN THÀNH MÀU TRẮNG XUẤT HIỆN LỖI FLASHBANG
+	function Options:SetTheme(Info)
+		Theme = Info or Theme
+		Window.BackgroundColor3 = Theme.Primary
+		Holder.BackgroundColor3 = Theme.Secondary
+		local stroke = Window:FindFirstChildOfClass("UIStroke")
+		if stroke then stroke.Color = Theme.Shadow end
+	end
+
+	function Options:SetSetting(Setting, Value)
+		if Setting == "Size" then
+			Window.Size = Value
+			Setup.Size = Value
+		elseif Setting == "Transparency" then
+			Window.GroupTransparency = Value
+			Setup.Transparency = Value
+		elseif Setting == "Theme" and typeof(Value) == "table" then
+			Options:SetTheme(Value)
+		elseif Setting == "Keybind" then
+			Setup.Keybind = Value
+		end
+	end
+
+	SetProperty(Window, { Size = Settings.Size or UDim2.fromOffset(580, 440), Visible = true, Parent = Screen });
 	Animations:Open(Window, Settings.Transparency or 0)
 
 	return Options
