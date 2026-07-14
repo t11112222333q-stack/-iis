@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Enhanced Color Engine & Full Toggle Support)
+	Made by Late (Fixed SetTheme Dynamic Colors & Mobile Toggle Edition)
 ]]
 
 --// Connections
@@ -23,7 +23,7 @@ local Setup = {
 	Size = nil,
 }
 
-local Theme = {
+local Theme = { --// (Dark Theme Default)
 	Primary = Color3.fromRGB(30, 30, 30),
 	Secondary = Color3.fromRGB(35, 35, 35),
 	Component = Color3.fromRGB(40, 40, 40),
@@ -539,10 +539,10 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		
 		local Set = function(Value)
 			if Value then
-				Tween(Main, .2, { BackgroundColor3 = Theme.Interactables or Color3.fromRGB(153, 155, 255) });
+				Tween(Main, .2, { BackgroundColor3 = Color3.fromRGB(153, 155, 255) });
 				Tween(Circle, .2, { BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.new(1, -16, 0.5, 0) });
 			else
-				Tween(Main, .2, { BackgroundColor3 = Theme.Component });
+				Tween(Main, .2, { BackgroundColor3 = Theme.Interactables });
 				Tween(Circle, .2, { BackgroundColor3 = Theme.Primary, Position = UDim2.new(0, 3, 0.5, 0) });
 			end
 			On.Value = Value
@@ -716,46 +716,43 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		}
 	end
 
-	-- HÀM ÉP TÔ MÀU SANG TRỌNG (COLOR ENGINE) DỰA TRÊN THEME ĐƯỢC CHỌN
+	-- HÀM ÉP TÔ MÀU ĐỘNG CÔ LẬP LỖI (CHỐNG TRƠ MÀU HOÀN TOÀN)
 	function Options:SetTheme(Info)
 		Theme = Info or Theme
 
-		pcall(function()
-			-- Tô màu khung nền chính & thanh Sidebar
-			Window.BackgroundColor3 = Theme.Primary
-			if Sidebar then Sidebar.BackgroundColor3 = Theme.Primary end
-			if Holder then Holder.BackgroundColor3 = Theme.Secondary end
-			
-			local stroke = Window:FindFirstChildOfClass("UIStroke")
-			if stroke then stroke.Color = Theme.Outline or Theme.Shadow end
+		-- ÉP MÀU LỚP NỀN CHÍNH
+		if Window then Window.BackgroundColor3 = Theme.Primary end
+		if Sidebar then Sidebar.BackgroundColor3 = Theme.Primary end
+		if Holder then Holder.BackgroundColor3 = Theme.Secondary end
+		
+		local stroke = Window and Window:FindFirstChildOfClass("UIStroke")
+		if stroke then stroke.Color = Theme.Outline or Theme.Shadow end
 
-			-- Quét tô màu từng phần tử con
-			for _, v in pairs(Window:GetDescendants()) do
-				pcall(function()
-					if v:IsA("TextLabel") then
-						if v.Name == "Title" or v.Name == "Section" then
-							v.TextColor3 = Theme.Title
-						elseif v.Name == "Description" or v.Name == "TextLabel" then
-							v.TextColor3 = Theme.Description
-						end
-					elseif v:IsA("Frame") or v:IsA("TextButton") or v:IsA("CanvasGroup") then
-						if v.Name == "Main" or v.Name == "Button" or v.Name == "Toggle" or v.Name == "Slider" or v.Name == "Input" or v.Name == "Dropdown" then
-							v.BackgroundColor3 = Theme.Component
-						elseif v.Name == "Highlight" or v.Name == "Circle" then
-							v.BackgroundColor3 = Theme.Interactables
-						elseif v.Name == "Sidebar" then
-							v.BackgroundColor3 = Theme.Primary
-						end
-					elseif v:IsA("ImageLabel") or v:IsA("ImageButton") then
-						if v.Name ~= "ToggleButton" then
-							v.ImageColor3 = Theme.Icon
-						end
-					elseif v:IsA("UIStroke") then
-						v.Color = Theme.Outline
-					end
-				end)
+		-- QUÉT TỪNG PHẦN TỬ ĐỂ ÉP MÀU THAY VÌ BỌC PCALL CẢ KHỐI GÂY SẬP LUỒNG
+		local descendants = Window and Window:GetDescendants() or {}
+		for _, v in pairs(descendants) do
+			if v:IsA("TextLabel") then
+				if v.Name == "Title" or v.Name == "Section" or v.Name == "TextLabel" then
+					pcall(function() v.TextColor3 = Theme.Title end)
+				elseif v.Name == "Description" then
+					pcall(function() v.TextColor3 = Theme.Description end)
+				end
+			elseif v:IsA("Frame") or v:IsA("TextButton") or v:IsA("CanvasGroup") then
+				if v.Name == "Main" or v.Name == "Button" or v.Name == "Toggle" or v.Name == "Slider" or v.Name == "Input" or v.Name == "Dropdown" then
+					pcall(function() v.BackgroundColor3 = Theme.Component end)
+				elseif v.Name == "Highlight" or v.Name == "Circle" then
+					pcall(function() v.BackgroundColor3 = Theme.Interactables end)
+				elseif v.Name == "Sidebar" then
+					pcall(function() v.BackgroundColor3 = Theme.Primary end)
+				end
+			elseif v:IsA("ImageLabel") or v:IsA("ImageButton") then
+				if v.Name ~= "ToggleButton" then
+					pcall(function() v.ImageColor3 = Theme.Icon end)
+				end
+			elseif v:IsA("UIStroke") then
+				pcall(function() v.Color = Theme.Outline end)
 			end
-		end)
+		end
 	end
 
 	function Options:SetSetting(Setting, Value)
