@@ -1,6 +1,6 @@
 --[[
 	User Interface Library
-	Made by Late (Fixed SetTheme & Colors Edition)
+	Made by Late (Fixed Dynamic SetTheme & Color Engine Edition)
 ]]
 
 --// Connections
@@ -716,34 +716,42 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 		}
 	end
 
-	-- CẬP NHẬT DỰA VÀO CÁC MẢNG THUỘC TÍNH
+	-- HÀM CẬP NHẬT MÀU DYNAMIC ĐÃ DỌN ĐẸP TOÀN BỘ CÁC CHI TIẾT
 	function Options:SetTheme(Info)
 		Theme = Info or Theme
 
-		Window.BackgroundColor3 = Theme.Primary
-		Holder.BackgroundColor3 = Theme.Secondary
-		
-		local stroke = Window:FindFirstChildOfClass("UIStroke")
-		if stroke then stroke.Color = Theme.Shadow end
+		pcall(function()
+			Window.BackgroundColor3 = Theme.Primary
+			if Sidebar then Sidebar.BackgroundColor3 = Theme.Primary end
+			if Holder then Holder.BackgroundColor3 = Theme.Secondary end
+			
+			local stroke = Window:FindFirstChildOfClass("UIStroke")
+			if stroke then stroke.Color = Theme.Shadow end
 
-		-- Đổi màu trực tiếp các phần tử UI con
-		for _, v in pairs(Window:GetDescendants()) do
-			pcall(function()
-				if v:IsA("TextLabel") then
-					if v.Name == "Title" then
-						v.TextColor3 = Theme.Title
-					elseif v.Name == "Description" or v.Name == "TextLabel" then
-						v.TextColor3 = Theme.Description
+			for _, v in pairs(Screen:GetDescendants()) do
+				pcall(function()
+					if v:IsA("TextLabel") then
+						if v.Name == "Title" or v.Name == "Section" or v.Name == "TextLabel" then
+							v.TextColor3 = Theme.Title
+						elseif v.Name == "Description" then
+							v.TextColor3 = Theme.Description
+						end
+					elseif v:IsA("Frame") or v:IsA("TextButton") or v:IsA("CanvasGroup") then
+						if v.Name == "Main" or v.Name == "Button" or v.Name == "Toggle" or v.Name == "Slider" or v.Name == "Input" or v.Name == "Dropdown" then
+							v.BackgroundColor3 = Theme.Component
+						elseif v.Name == "Sidebar" then
+							v.BackgroundColor3 = Theme.Primary
+						end
+					elseif v:IsA("ImageLabel") or v:IsA("ImageButton") then
+						if v.Name ~= "ToggleButton" then
+							v.ImageColor3 = Theme.Icon
+						end
+					elseif v:IsA("UIStroke") then
+						v.Color = Theme.Outline
 					end
-				elseif v:IsA("Frame") or v:IsA("TextButton") then
-					if v.Name == "Main" or v.Name == "Button" or v.Name == "Toggle" or v.Name == "Slider" then
-						v.BackgroundColor3 = Theme.Component
-					end
-				elseif v:IsA("ImageLabel") then
-					v.ImageColor3 = Theme.Icon
-				end
-			end)
-		end
+				end)
+			end
+		end)
 	end
 
 	function Options:SetSetting(Setting, Value)
