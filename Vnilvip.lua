@@ -17,7 +17,7 @@ local playerGui = localPlayer:WaitForChild("PlayerGui")
 --// Load Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/t11112222333q-stack/-iis/refs/heads/main/Teaat.lua"))()
 
---// 🔑 HỆ THỐNG ONLINE FETCHING KEY DATABASE
+--// HỆ THỐNG ONLINE FETCHING KEY DATABASE
 local KEY_DATABASE_URL = "https://raw.githubusercontent.com/username/repository/main/keys.json"
 getgenv().KeySystemDatabase = {}
 
@@ -63,7 +63,7 @@ folderESP.Name = "ESP"
 local weaponHistory = {} 
 
 -- ============================================================================
--- 🎨 BẢNG MÀU THUẬN TIỆN & PHONG PHÚ CHO LATES LIB
+-- BẢNG MÀU THUẬN TIỆN & PHONG PHÚ CHO LATES LIB
 -- ============================================================================
 local Themes = {
 	Dark = {
@@ -84,31 +84,31 @@ local Themes = {
 		Tab = Color3.fromRGB(50, 50, 50), Title = Color3.fromRGB(0, 0, 0), Description = Color3.fromRGB(100, 100, 100),
 		Shadow = Color3.fromRGB(255, 255, 255), Outline = Color3.fromRGB(210, 210, 210), Icon = Color3.fromRGB(100, 100, 100),
 	},
-	Amethyst = { -- Tím Thạch Anh
+	Amethyst = {
 		Primary = Color3.fromRGB(28, 20, 38), Secondary = Color3.fromRGB(38, 28, 52),
 		Component = Color3.fromRGB(50, 36, 68), Interactables = Color3.fromRGB(65, 45, 90),
 		Tab = Color3.fromRGB(220, 180, 255), Title = Color3.fromRGB(245, 225, 255), Description = Color3.fromRGB(180, 150, 210),
 		Shadow = Color3.fromRGB(10, 5, 15), Outline = Color3.fromRGB(80, 50, 110), Icon = Color3.fromRGB(220, 180, 255),
 	},
-	Emerald = { -- Xanh Lục Bảo
+	Emerald = {
 		Primary = Color3.fromRGB(15, 32, 25), Secondary = Color3.fromRGB(22, 42, 33),
 		Component = Color3.fromRGB(30, 56, 44), Interactables = Color3.fromRGB(38, 72, 56),
 		Tab = Color3.fromRGB(180, 255, 210), Title = Color3.fromRGB(220, 255, 235), Description = Color3.fromRGB(140, 200, 165),
-		Shadow = Color3.fromRGB(5, 15, 10), Outline = Color3.fromRGB(45, 85, 65), Icon = Color3.fromRGB(180, 255, 210),
+		Shadow = Color3.fromRGB(45, 85, 65), Icon = Color3.fromRGB(180, 255, 210),
 	},
-	Sakura = { -- Hồng Anh Đào
+	Sakura = {
 		Primary = Color3.fromRGB(38, 22, 30), Secondary = Color3.fromRGB(50, 30, 40),
 		Component = Color3.fromRGB(65, 38, 52), Interactables = Color3.fromRGB(85, 48, 68),
 		Tab = Color3.fromRGB(255, 190, 220), Title = Color3.fromRGB(255, 230, 240), Description = Color3.fromRGB(210, 150, 180),
 		Shadow = Color3.fromRGB(15, 5, 10), Outline = Color3.fromRGB(100, 55, 80), Icon = Color3.fromRGB(255, 190, 220),
 	},
-	Cyberpunk = { -- Vàng / Tím Cyber
+	Cyberpunk = {
 		Primary = Color3.fromRGB(20, 20, 28), Secondary = Color3.fromRGB(30, 25, 42),
 		Component = Color3.fromRGB(45, 35, 60), Interactables = Color3.fromRGB(255, 200, 0),
 		Tab = Color3.fromRGB(0, 240, 255), Title = Color3.fromRGB(255, 230, 0), Description = Color3.fromRGB(0, 200, 220),
 		Shadow = Color3.fromRGB(0, 0, 0), Outline = Color3.fromRGB(255, 0, 120), Icon = Color3.fromRGB(0, 240, 255),
 	},
-	Sunset = { -- Cam Hoàng Hôn
+	Sunset = {
 		Primary = Color3.fromRGB(35, 22, 18), Secondary = Color3.fromRGB(48, 30, 22),
 		Component = Color3.fromRGB(62, 38, 28), Interactables = Color3.fromRGB(80, 48, 32),
 		Tab = Color3.fromRGB(255, 180, 130), Title = Color3.fromRGB(255, 220, 190), Description = Color3.fromRGB(210, 140, 100),
@@ -128,7 +128,7 @@ local Window = Library:CreateWindow({
 Window:SetTheme(Themes.Dark)
 
 -- ============================================================================
--- 📱 NÚT ẨN HIỆN MENU (MOBILE TOGGLE BUTTON)
+-- NÚT ẨN HIỆN MENU (MOBILE TOGGLE BUTTON)
 -- ============================================================================
 local mobileGui = Instance.new("ScreenGui")
 mobileGui.Name = "MMBMobileToggleGui"
@@ -151,7 +151,6 @@ local btnStroke = Instance.new("UIStroke", toggleBtn)
 btnStroke.Color = Color3.fromRGB(225, 29, 72)
 btnStroke.Thickness = 1.5
 
--- Kéo thả nút ẩn/hiện trên màn hình
 local dragging, dragInput, dragStart, startPos
 toggleBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -179,7 +178,6 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Sự kiện ẩn/hiện menu khi ấn nút
 toggleBtn.MouseButton1Click:Connect(function()
     if Window and type(Window.Toggle) == "function" then
         pcall(function() Window:Toggle() end)
@@ -187,7 +185,7 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================================
--- 📂 ĐỊNH NGHĨA CÁC SECTIONS VÀ TABS
+-- ĐỊNH NGHĨA CÁC SECTIONS VÀ TABS
 -- ============================================================================
 Window:AddTabSection({ Name = "Main Features", Order = 1 })
 Window:AddTabSection({ Name = "Combat & Radar", Order = 2 })
@@ -201,7 +199,7 @@ local TabFixLag = Window:AddTab({ Title = "Fix Lag", Section = "System & Visuals
 local TabSettings = Window:AddTab({ Title = "Cài Đặt", Section = "System & Visuals", Icon = "rbxassetid://11293977610" })
 
 -- ============================================================================
--- 👤 TAB 1: TÙY CHỈNH HỒ SƠ
+-- Hồ Sơ
 -- ============================================================================
 Window:AddSection({ Name = "Fake Profile Customization", Tab = TabProfile })
 
@@ -280,7 +278,7 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- 🌾 TAB 2: FARM (JOB DELIVERY & CHEST)
+-- Farm
 -- ============================================================================
 Window:AddSection({ Name = "Auto Job Delivery (Fly Mode V42)", Tab = TabFarm })
 
@@ -341,7 +339,9 @@ end
 RunService.Stepped:Connect(function()
     if (_G.AutoDeliveryRunning or _G.AutoLoot or _G.FlyTopDown or _G.FlyOrbitAround) and localPlayer.Character then
         local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum and hum:GetState() ~= Enum.HumanoidStateType.Running then hum:ChangeState(Enum.HumanoidStateType.Running) end
+        if hum then 
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
         for _, part in pairs(localPlayer.Character:GetChildren()) do if part:IsA("BasePart") then part.CanCollide = false end end
     end
 end)
@@ -394,6 +394,7 @@ local function findValidChestOnly()
     return nil
 end
 
+-- ĐÃ FIX CAO ĐỘ: BAY VỪA ĐỦ SÁT ĐỂ NHẶT (OFFSET CAO ĐỘ ĐỨNG TRÊN RƯƠNG RỒI GHIM LUÔN)
 task.spawn(function()
     while true do
         task.wait(0.01)
@@ -405,23 +406,21 @@ task.spawn(function()
                 if chest and chest.Parent then
                     local originalCF = root.CFrame 
                     local chestPos = chest:GetPivot().Position 
-                    local safeFloatingPos = CFrame.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
+                    -- ĐÃ THAY ĐỔI: Chỉnh offset Y lên một khoảng cực nhỏ vừa đủ (+1.2) studs giúp nhân vật đứng ngay trên rương mà không bị rơi tự do hay lút sâu
+                    local safeFloatingPos = CFrame.new(chestPos.X, chestPos.Y + 1.2, chestPos.Z)
                     
                     for _, p in ipairs(char:GetChildren()) do if p:IsA("BasePart") then p.CanCollide = false end end
                     
                     local baseSpeed = getgenv().CHEST_SPEED_TWEEN or 85
                     
-                    -- VÒNG LẶP DI CHUYỂN DYNAMIC SPEED (ĐÃ PHANH CHẬM MƯỢT KHI BAY ĐẾN GẦN RƯƠNG)
                     while (root.Position - safeFloatingPos.Position).Magnitude > 2.5 and _G.AutoLoot and chest.Parent do
                         local dist = (safeFloatingPos.Position - root.Position).Magnitude
                         local dir = (safeFloatingPos.Position - root.Position).Unit
                         
                         local currentSpeed = baseSpeed
                         if dist > 25 then
-                            -- Ở xa: Nhân tối đa xé gió để kéo khoảng cách nhanh nhất
                             currentSpeed = math.max(baseSpeed * 3.5, dist * 6.5)
                         else
-                            -- Ở gần (dưới 25 studs): Thắt phanh giảm tốc mượt mà theo khoảng cách thực tế
                             currentSpeed = math.clamp(dist * 3.2, 20, baseSpeed)
                         end
                         
@@ -461,9 +460,9 @@ task.spawn(function()
 end)
 
 -- ============================================================================
--- ⚔️ TAB 3: PVP & TARGET RADAR
+-- PvP
 -- ============================================================================
-Window:AddSection({ Name = "🔑 Key Scanner System", Tab = TabPvP })
+Window:AddSection({ Name = "Key Scanner System", Tab = TabPvP })
 
 _G.KeyCheckESPState = false
 Window:AddToggle({
@@ -528,7 +527,7 @@ Window:AddButton({
 	Title = "Phóng To Hitbox Vũ Khí Đang Cầm", Tab = TabPvP,
 	Callback = function()
 		if localPlayer.Character then
-            for _, tool in ipairs(localPlayer.Character:GetChildren()) do
+            for _, tool in ipairs(toolCoins) do
                 if tool:IsA("Tool") then for _, p in ipairs(tool:GetDescendants()) do if p:IsA("BasePart") then p.Size = Vector3.new(getgenv().HitBoxX, getgenv().HitBoxY, getgenv().HitBoxZ) p.Massless = true p.CanCollide = false end end end
             end
             Window:Notify({ Title = "Hitbox Updated", Description = "Đã tăng kích thước đòn đánh vũ khí!", Duration = 3 })
@@ -836,7 +835,7 @@ Window:AddButton({
 })
 
 -- ============================================================================
--- ⚙️ TAB 6: CÀI ĐẶT & CHỨC NĂNG HỆ THỐNG (MỚI: ANTI-AFK & CASH TRACKER)
+-- ⚙️ TAB 6: CÀI ĐẶT & CHỨC NĂNG HỆ THỐNG
 -- ============================================================================
 Window:AddSection({ Name = "Cấu Hình Giao Diện & Theme Màu Đẹp", Tab = TabSettings })
 
@@ -880,8 +879,7 @@ Window:AddSlider({
 
 Window:AddSection({ Name = "Hệ Thống Tiện Ích Treo Máy (Anti-AFK / Cash)", Tab = TabSettings })
 
--- CHỨC NĂNG 1: ANTI-AFK HOÀN CHỈNH
-_G.AntiAFKState = true -- Mặc định bật
+_G.AntiAFKState = true
 Window:AddToggle({
     Title = "Kích Hoạt Anti-AFK (Bypass Kick IDLE)",
     Description = "Ngăn chặn bị tự động đuổi khỏi máy chủ sau 20 phút treo máy",
@@ -907,7 +905,6 @@ task.spawn(function()
     end)
 end)
 
--- CHỨC NĂNG 2: CẬP NHẬT SỐ TIỀN CASH LIÊN TỤC
 local cashParagraph = Window:AddParagraph({ 
     Title = "💵 Tài Sản Hiện Tại", 
     Description = "Đang tải ví tiền...", 
@@ -928,11 +925,9 @@ local function SetupCashTracker()
                     local rawAmount = cashValue.Value
                     local displayStr = "Số dư ví: " .. FormatNumber(rawAmount) .. " $"
                     
-                    -- Cập nhật vào ô thông tin trong cài đặt
                     cashParagraph:SetTitle("💵 Tài Sản Hiện Tại")
                     cashParagraph:SetDescription(displayStr)
                     
-                    -- Cập nhật động lên tiêu đề cửa sổ chính của Menu
                     pcall(function()
                         Window:SetTitle("MEMAYBEO HUB V42 | Money: " .. FormatNumber(rawAmount) .. " $")
                     end)
