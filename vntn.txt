@@ -93,6 +93,9 @@ local folderESP = workspace:FindFirstChild("ESP") or Instance.new("Folder", work
 folderESP.Name = "ESP"
 local weaponHistory = {} 
 
+-- Cấu hình Auto Nhặt Thính
+local isAutoCrateEnabled = false
+
 -- ============================================================================
 -- KHỞI TẠO MENU CHÍNH (FLUENT)
 -- ============================================================================
@@ -137,10 +140,11 @@ toggleBtn.MouseButton1Click:Connect(function()
     Window:Minimize(not Window.Minimized)
 end)
 
--- KHỞI TẠO TABS (CHỈ GIỮ LẠI ĐÚNG ICON PHẦN CỨNG TAB GÀ GẤU AI)
+-- KHỞI TẠO TABS
 local Tabs = {
     Profile = Window:AddTab({ Title = "Hồ Sơ (V42)" }),
     FarmBoss = Window:AddTab({ Title = "Farm Boss" }),
+    Crate = Window:AddTab({ Title = "Auto Crate" }), -- Tab mới thêm vào
     GaGau = Window:AddTab({ Title = "Gà Gấu AI", Icon = "rbxassetid://10888331510" }),
     PvP = Window:AddTab({ Title = "PvP Combat" }),
     Server = Window:AddTab({ Title = "Server Hop" }),
@@ -351,6 +355,54 @@ localPlayer.CharacterAdded:Connect(function() task.wait(1.2) UpdateAllNames(cust
 task.spawn(function() while task.wait(2) do local guiLabel = GetPlayerGuiNameLabel() if guiLabel and guiLabel.Text ~= customNameStorage and customNameStorage ~= "" then guiLabel.Text = customNameStorage end end end)
 
 -- ============================================================================
+-- AUTO CRATE (NHẶT THÍNH CHỈ ĐỊNH)
+-- ============================================================================
+local SectionCrate = Tabs.Crate:AddSection("Tự Động Nhặt Hòm Thính (Crate)")
+
+SectionCrate:AddToggle("ToggleAutoCrate", {
+    Title = "Kích hoạt Auto Nhặt Thính",
+    Description = "Tự động bay đến hòm thính và tự kích hoạt nhặt đồ",
+    Default = false,
+    Callback = function(state)
+        isAutoCrateEnabled = state
+        if state then
+            Fluent:Notify({ Title = "Auto Crate", Content = "Đã bật chế độ săn thính tự động!", Duration = 3 })
+        else
+            Fluent:Notify({ Title = "Auto Crate", Content = "Đã tắt chế độ săn thính.", Duration = 3 })
+        end
+    end
+})
+
+-- Luồng quét xử lý dịch chuyển và nhặt thính liên tục
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if isAutoCrateEnabled then
+            pcall(function()
+                -- Tìm hòm thính trong workspace
+                local crate = workspace:FindFirstChild("Crate")
+                local character = localPlayer.Character
+                local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+                
+                if crate and rootPart then
+                    local center = crate:FindFirstChild("Center")
+                    if center then
+                        -- 1. Teleport đến hòm thính (giữ khoảng cách nhỏ vừa đủ để nhặt)
+                        rootPart.CFrame = center.CFrame * CFrame.new(0, 2, 0)
+                        
+                        -- 2. Tìm và tự động kích hoạt ProximityPrompt để nhặt thính
+                        local prompt = center:FindFirstChildOfClass("ProximityPrompt")
+                        if prompt then
+                            fireproximityprompt(prompt)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ============================================================================
 -- Gà Gấu AI
 -- ============================================================================
 local SectionAIHead = Tabs.GaGau:AddSection("Trạng Thái Phân Tích Lõi Matrix v43.7")
@@ -363,6 +415,15 @@ local scoreTracker = Tabs.GaGau:AddParagraph({ Title = "Thống Kê Phiên Độ
 local pulseTracker = Tabs.GaGau:AddParagraph({ Title = "Đồng Bộ Xung Hệ Thống", Content = "XUNG NHỊP GAME: Đang quét...\nSố Dư: Đang quét...\nThắng: 0/150 | Thua lt: 0" })
 
 local SectionConfigsGG = Tabs.GaGau:AddSection("Cấu Hình Thuật Toán Giao Dịch")
+
+local function FormatNumber(num)
+    local formatted = tostring(num)
+    while true do  
+        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+        if k == 0 then break end
+    end
+    return formatted
+end
 
 local function execBet(side, amt)
     if not autoGaGau then return end
