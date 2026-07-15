@@ -389,35 +389,70 @@ local function findValidChestOnly()
     return nil
 end
 
+-- ============================================================================
+-- ⚡ LẬP TRÌNH BAY NHANH NHƯ CHỚP & TỰ ĐỘNG THẮP PHANH KHI LẠI GẦN RƯƠNG
+-- ============================================================================
 task.spawn(function()
     while true do
-        task.wait(0.05)
+        task.wait(0.01)
         if _G.AutoLoot then
             pcall(function()
                 local char = localPlayer.Character local hum = char and char:FindFirstChildOfClass("Humanoid") local root = char and char:FindFirstChild("HumanoidRootPart")
-                if not root or not hum or hum.Health <= 15 then task.wait(0.5) return end
+                if not root or not hum or hum.Health <= 15 then task.wait(0.3) return end
                 local chest = findValidChestOnly()
                 if chest and chest.Parent then
-                    local originalCF = root.CFrame local chestPos = chest:GetPivot().Position local safeFloatingPos = CFrame.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
+                    local originalCF = root.CFrame 
+                    local chestPos = chest:GetPivot().Position 
+                    local safeFloatingPos = CFrame.new(chestPos.X, chestPos.Y + 5.5, chestPos.Z)
+                    
                     for _, p in ipairs(char:GetChildren()) do if p:IsA("BasePart") then p.CanCollide = false end end
-                    local teleportSpeed = getgenv().CHEST_SPEED_TWEEN or 85
-                    while (root.Position - safeFloatingPos.Position).Magnitude > 3 and _G.AutoLoot and chest.Parent do
+                    
+                    local baseSpeed = getgenv().CHEST_SPEED_TWEEN or 85
+                    
+                    -- VÒNG LẶP DI CHUYỂN DYNAMIC SPEED (BAY NHƯ CHỚP RỒI GIẢM TỐC)
+                    while (root.Position - safeFloatingPos.Position).Magnitude > 2.5 and _G.AutoLoot and chest.Parent do
+                        local dist = (safeFloatingPos.Position - root.Position).Magnitude
                         local dir = (safeFloatingPos.Position - root.Position).Unit
+                        
+                        local currentSpeed = baseSpeed
+                        if dist > 20 then
+                            -- Ở xa: Nhân 3.5 lần tốc độ cơ bản (xé gió cực nhanh)
+                            currentSpeed = math.max(baseSpeed * 3.5, dist * 6.5)
+                        else
+                            -- Ở gần (dưới 20 studs): Thắt phanh về tốc độ chuẩn để vào vị trí an toàn
+                            currentSpeed = math.clamp(dist * 5, 25, baseSpeed)
+                        end
+                        
+                        local delta = RunService.Heartbeat:Wait()
                         root.AssemblyLinearVelocity = Vector3.zero
-                        root.CFrame = CFrame.new(root.Position + (dir * (teleportSpeed * RunService.Heartbeat:Wait())))
+                        root.AssemblyAngularVelocity = Vector3.zero
+                        root.CFrame = CFrame.new(root.Position + (dir * (currentSpeed * delta)))
                     end
-                    root.CFrame = safeFloatingPos root.AssemblyLinearVelocity = Vector3.zero root.AssemblyAngularVelocity = Vector3.zero
+                    
+                    -- Khóa cứng vị trí chính xác trên rương
+                    root.CFrame = safeFloatingPos 
+                    root.AssemblyLinearVelocity = Vector3.zero 
+                    root.AssemblyAngularVelocity = Vector3.zero
+                    
                     local prompt = chest:FindFirstChild("Open") and chest.Open:FindFirstChild("2") and chest.Open["2"]:FindFirstChildWhichIsA("ProximityPrompt", true) or chest:FindFirstChildWhichIsA("ProximityPrompt", true)
                     if prompt then 
-                        prompt.MaxActivationDistance = 500 prompt.RequiresLineOfSight = false 
+                        prompt.MaxActivationDistance = 500 
+                        prompt.RequiresLineOfSight = false 
                         local grabAttempts = 0
                         repeat 
                             if not _G.AutoLoot or not hum or hum.Health <= 30 or not chest.Parent then break end
-                            root.CFrame = safeFloatingPos root.AssemblyLinearVelocity = Vector3.zero 
-                            fireproximityprompt(prompt) task.wait(0.12) grabAttempts = grabAttempts + 1
+                            root.CFrame = safeFloatingPos 
+                            root.AssemblyLinearVelocity = Vector3.zero 
+                            fireproximityprompt(prompt) 
+                            task.wait(0.12) 
+                            grabAttempts = grabAttempts + 1
                         until not chest.Parent or grabAttempts > 35
                     end
-                    if hum and hum.Health > 30 and root and originalCF then root.CFrame = originalCF root.AssemblyLinearVelocity = Vector3.zero task.wait(0.15) end
+                    if hum and hum.Health > 30 and root and originalCF then 
+                        root.CFrame = originalCF 
+                        root.AssemblyLinearVelocity = Vector3.zero 
+                        task.wait(0.15) 
+                    end
                 end
             end)
         end
@@ -920,4 +955,3 @@ Window:Notify({
 	Description = "Nhấn phím [END] trên bàn phím để Ẩn / Hiện Menu!",
 	Duration = 7
 })
-
