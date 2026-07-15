@@ -303,6 +303,11 @@ Window:AddToggle({
 	Callback = function(state) _G.AutoLoot = state end
 })
 
+Window:AddSlider({
+	Title = "Tốc Độ Săn Rương Tối Đa", Description = "Điều chỉnh tốc độ di chuyển nhặt rương (Mặc định: 85)", Tab = TabFarm, MaxValue = 250,
+	Callback = function(v) getgenv().CHEST_SPEED_TWEEN = v end
+})
+
 -- Teleport Engine & Job Loops
 local function bypassTweenEngine(targetPos, speed, checkGlobalVariable, ignoreHeight)
     local char = localPlayer.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -389,9 +394,6 @@ local function findValidChestOnly()
     return nil
 end
 
--- ============================================================================
--- ⚡ LẬP TRÌNH BAY NHANH NHƯ CHỚP & TỰ ĐỘNG THẮP PHANH KHI LẠI GẦN RƯƠNG
--- ============================================================================
 task.spawn(function()
     while true do
         task.wait(0.01)
@@ -409,18 +411,18 @@ task.spawn(function()
                     
                     local baseSpeed = getgenv().CHEST_SPEED_TWEEN or 85
                     
-                    -- VÒNG LẶP DI CHUYỂN DYNAMIC SPEED (BAY NHƯ CHỚP RỒI GIẢM TỐC)
+                    -- VÒNG LẶP DI CHUYỂN DYNAMIC SPEED (ĐÃ PHANH CHẬM MƯỢT KHI BAY ĐẾN GẦN RƯƠNG)
                     while (root.Position - safeFloatingPos.Position).Magnitude > 2.5 and _G.AutoLoot and chest.Parent do
                         local dist = (safeFloatingPos.Position - root.Position).Magnitude
                         local dir = (safeFloatingPos.Position - root.Position).Unit
                         
                         local currentSpeed = baseSpeed
-                        if dist > 20 then
-                            -- Ở xa: Nhân 3.5 lần tốc độ cơ bản (xé gió cực nhanh)
+                        if dist > 25 then
+                            -- Ở xa: Nhân tối đa xé gió để kéo khoảng cách nhanh nhất
                             currentSpeed = math.max(baseSpeed * 3.5, dist * 6.5)
                         else
-                            -- Ở gần (dưới 20 studs): Thắt phanh về tốc độ chuẩn để vào vị trí an toàn
-                            currentSpeed = math.clamp(dist * 5, 25, baseSpeed)
+                            -- Ở gần (dưới 25 studs): Thắt phanh giảm tốc mượt mà theo khoảng cách thực tế
+                            currentSpeed = math.clamp(dist * 3.2, 20, baseSpeed)
                         end
                         
                         local delta = RunService.Heartbeat:Wait()
@@ -429,7 +431,6 @@ task.spawn(function()
                         root.CFrame = CFrame.new(root.Position + (dir * (currentSpeed * delta)))
                     end
                     
-                    -- Khóa cứng vị trí chính xác trên rương
                     root.CFrame = safeFloatingPos 
                     root.AssemblyLinearVelocity = Vector3.zero 
                     root.AssemblyAngularVelocity = Vector3.zero
