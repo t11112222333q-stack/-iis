@@ -7,7 +7,6 @@ local realconfigs = {
     autoblock = false,
     funcEnabled = true,
     advancedinfo = false,
-    --logreturnvalues = false,
     supersecretdevtoggle = false
 }
 
@@ -119,7 +118,7 @@ local function IsCyclicTable(tbl)
     local function SearchTable(tbl)
         table.insert(checkedtables,tbl)
         
-        for i,v in next, tbl do -- Stupid mistake on my part thanks 59it for pointing it out
+        for i,v in next, tbl do
             if type(v) == "table" then
                 return table.find(checkedtables,v) and true or SearchTable(v)
             end
@@ -159,7 +158,7 @@ local function rawtostring(userdata)
 		if cachedstring then
             local wasreadonly = isreadonly(rawmetatable)
             if wasreadonly then
-                makwritable(rawmetatable)
+                makewritable(rawmetatable)
             end
 			rawset(rawmetatable, "__tostring", nil)
 			local safestring = tostring(userdata)
@@ -181,7 +180,7 @@ local TweenService = SafeGetService("TweenService")
 local ContentProvider = SafeGetService("ContentProvider")
 local TextService = SafeGetService("TextService")
 local http = SafeGetService("HttpService")
-local GuiInset = game:GetService("GuiService"):GetGuiInset() :: Vector2 -- pulled from rewrite
+local GuiInset = game:GetService("GuiService"):GetGuiInset() :: Vector2
 
 local function jsone(str) return http:JSONEncode(str) end
 local function jsond(str)
@@ -191,7 +190,7 @@ end
 
 function ErrorPrompt(Message,state)
     if getrenv then
-        local ErrorPrompt = getrenv().require(CoreGui:WaitForChild("RobloxGui"):WaitForChild("Modules"):WaitForChild("ErrorPrompt")) -- File can be located in your roblox folder (C:\Users\%Username%\AppData\Local\Roblox\Versions\whateverversionitis\ExtraContent\scripts\CoreScripts\Modules)
+        local ErrorPrompt = getrenv().require(CoreGui:WaitForChild("RobloxGui"):WaitForChild("Modules"):WaitForChild("ErrorPrompt"))
         local prompt = ErrorPrompt.new("Default",{HideErrorCode = true})
         local ErrorStoarge = Create("ScreenGui",{Parent = CoreGui,ResetOnSpawn = false})
         local thread = state and running()
@@ -1227,7 +1226,8 @@ function i2p(i,customgen)
                     return i2p(player) .. ".Character" .. out
                 end
             else
-                if parent.Name:match("[%a_]+[%w+]*") Parent.Name then
+                -- VÁ LỖI CÚ PHÁP TẠI ĐÂY
+                if parent.Name:match("[%a_]+[%w+]*") ~= parent.Name then
                     out = ':FindFirstChild(' .. formatstr(parent.Name) .. ')' .. out
                 else
                     out = "." .. parent.Name .. out
@@ -1256,7 +1256,8 @@ function i2p(i,customgen)
                 getnilrequired = true
                 return 'getNil(' .. formatstr(parent.Name) .. ', "' .. parent.ClassName .. '")' .. out
             else
-                if parent.Name:match("[%a_]+[%w_]*") Parent.Name then
+                -- VÁ LỖI CÚ PHÁP TẠI ĐÂY
+                if parent.Name:match("[%a_]+[%w_]*") ~= parent.Name then
                     out = ':WaitForChild(' .. formatstr(parent.Name) .. ')' .. out
                 else
                     out = ':WaitForChild("' .. parent.Name .. '")'..out
@@ -1561,14 +1562,13 @@ local function shutdown()
     getgenv().SimpleSpyExecuted = false
 end
 
--- Khởi chạy hệ thống chính
 if not getgenv().SimpleSpyExecuted then
     local succeeded,err = pcall(function()
         if not RunService:IsClient() then error("MEMAYBEO HUB cannot run on the server!") end
         getgenv().SimpleSpyShutdown = shutdown
         onToggleButtonClick()
         if not hookmetamethod then
-            ErrorPrompt("MEMAYBEO HUB will not function to it's fullest capablity due to your executor not supporting hookmetamethod.",true)
+            ErrorPrompt("MEMAYBEO HUB will not function to it's fullest capability.",true)
         end
         codebox = Highlight.new(CodeBox)
         logthread(spawn(function()
@@ -1769,4 +1769,3 @@ newButton("Advanced Info", function() return ("[%s] Display more remoteinfo"):fo
     configs.advancedinfo = not configs.advancedinfo
     TextLabel.Text = ("[%s] Display more remoteinfo"):format(configs.advancedinfo and "ENABLED" or "DISABLED")
 end)
-
