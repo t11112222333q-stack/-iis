@@ -79,7 +79,7 @@ local hookmetamethod = hookmetamethod or (makewriteable and makereadonly and get
         return hookfunction(old[metamethod],func)
     else
         local oldmetamethod = old[metamethod]
-        makewriteable(old)
+        makewritable(old)
         old[metamethod] = func
         makereadonly(old)
         return oldmetamethod
@@ -451,8 +451,9 @@ function bringBackOnResize()
     TweenService.Create(TweenService, Background, TweenInfo.new(0.1), {Position = UDim2.new(0, currentX, 0, currentY)}):Play()
 end
 
+-- ĐÃ SỬA ĐỔI: Cơ chế bắt Drag rộng hơn cho phép nhấn giữ ở cả khung nền Background
 function onBarInput(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         local lastPos = UserInputService:GetMouseLocation()
         local mainPos = Background.AbsolutePosition
         local offset = mainPos - lastPos
@@ -480,7 +481,7 @@ function onBarInput(input)
                     end
                     currentPos = Vector2.new(currentX, currentY)
                     lastPos = newPos
-                    TweenService.Create(TweenService, Background, TweenInfo.new(0.1), {Position = UDim2.new(0, currentPos.X, 0, currentPos.Y)}):Play()
+                    TweenService.Create(TweenService, Background, TweenInfo.new(0.05), {Position = UDim2.new(0, currentPos.X, 0, currentPos.Y)}):Play()
                 end
             end)
         end
@@ -645,10 +646,15 @@ function isInResizeRange(p)
     return false
 end
 
+-- ĐÃ SỬA ĐỔI: Hàm kiểm tra vùng drag được nới lỏng để nhận diện việc kéo thả trên toàn bảng
 function isInDragRange(p)
     local relativeP = p - Background.AbsolutePosition
-    local topbarAS = TopBar.AbsoluteSize
-    return relativeP.X <= topbarAS.X - CloseButton.AbsoluteSize.X * 3 and relativeP.X >= 0 and relativeP.Y <= topbarAS.Y and relativeP.Y >= 0 or false
+    local size = Background.AbsoluteSize
+    -- Cho phép kéo thả trên toàn bảng ngoại trừ vùng rìa góc dưới bên phải (vùng dùng để resize kích thước)
+    if relativeP.X >= 0 and relativeP.X <= size.X - 10 and relativeP.Y >= 0 and relativeP.Y <= size.Y - 10 then
+        return true
+    end
+    return false
 end
 
 local customCursor = Create("ImageLabel",{Parent = SimpleSpy3,Visible = false,Size = UDim2.fromOffset(200, 200),ZIndex = 1e9,BackgroundTransparency = 1,Image = "",Parent = SimpleSpy3})
@@ -683,7 +689,7 @@ end
 function mouseMoved()
     local mousePos = UserInputService:GetMouseLocation() - GuiInset
     if not closed
-    and mousePos.X >= TopBar.AbsolutePosition.X and mousePos.X <= TopBar.AbsolutePosition.X + TopBar.AbsoluteSize.X
+    and mousePos.X >= Background.AbsolutePosition.X and mousePos.X <= Background.AbsolutePosition.X + Background.AbsoluteSize.X
     and mousePos.Y >= Background.AbsolutePosition.Y and mousePos.Y <= Background.AbsolutePosition.Y + Background.AbsoluteSize.Y then
         if not mouseInGui then
             mouseInGui = true
@@ -740,7 +746,7 @@ end
 function backgroundUserInput(input)
     local mousePos = UserInputService:GetMouseLocation() - GuiInset
     local inResizeRange, type = isInResizeRange(mousePos)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and inResizeRange then
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and inResizeRange then
         local lastPos = UserInputService:GetMouseLocation()
         local offset = Background.AbsoluteSize - lastPos
         local currentPos = lastPos + offset
@@ -1226,7 +1232,6 @@ function i2p(i,customgen)
                     return i2p(player) .. ".Character" .. out
                 end
             else
-                -- VÁ LỖI CÚ PHÁP TẠI ĐÂY
                 if parent.Name:match("[%a_]+[%w+]*") ~= parent.Name then
                     out = ':FindFirstChild(' .. formatstr(parent.Name) .. ')' .. out
                 else
@@ -1256,7 +1261,6 @@ function i2p(i,customgen)
                 getnilrequired = true
                 return 'getNil(' .. formatstr(parent.Name) .. ', "' .. parent.ClassName .. '")' .. out
             else
-                -- VÁ LỖI CÚ PHÁP TẠI ĐÂY
                 if parent.Name:match("[%a_]+[%w_]*") ~= parent.Name then
                     out = ':WaitForChild(' .. formatstr(parent.Name) .. ')' .. out
                 else
