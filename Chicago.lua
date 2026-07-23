@@ -1,4 +1,4 @@
-here--[[
+--[[
 	MEMAYBEO HUB v17.3 - PRISON LIFE SPECIALIST
 	- FIXED: Aimbot Offset. Aimbot now perfectly aligns with GunGUI.Crosshair.
 	- TỐC ĐỘ: Nhanh hơn đi bộ gấp nhiều lần, an toàn tuyệt đối qua mặt Anti-Cheat.
