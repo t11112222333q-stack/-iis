@@ -1,5 +1,5 @@
 -- ===================================================
--- AUTO FARM DELIVERY – BAY LÊN CAO + RESET + ANTI-AFK
+-- AUTO FARM DELIVERY – BAY LÊN CAO + RESET + ANTI-AFK CHUẨN
 -- ===================================================
 -- HƯỚNG DẪN: Copy toàn bộ, dán vào Executor, chạy.
 -- UI hiện ra góc trái, bấm "Bắt đầu" để chạy.
@@ -9,6 +9,7 @@ local plr = game:GetService("Players").LocalPlayer
 local tweenService = game:GetService("TweenService")
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
+local virtualUser = game:GetService("VirtualUser") -- Thêm service giả lập thao tác
 
 local char = plr.Character
 if not char or not char.Parent then return end
@@ -16,6 +17,14 @@ local rootPart = char:FindFirstChild("HumanoidRootPart")
 if not rootPart then return end
 
 local remoteGiao = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("DeliveryLocationInteracted")
+
+-- ===== ANTI-AFK CHỐNG KICK 20 PHÚT CỦA ROBLOX =====
+-- Tự động click chuột phải ảo mỗi khi hệ thống game chuẩn bị đếm giờ AFK
+plr.Idled:Connect(function()
+    virtualUser:CaptureController()
+    virtualUser:ClickButton2(Vector2.new())
+    print("🛡️ Anti-AFK: Đã giả lập thao tác chuột để chống kick!")
+end)
 
 -- ===== HÀM DI CHUYỂN BẰNG TWEEN =====
 local function MoveTo(targetCFrame, speed)
@@ -59,7 +68,7 @@ local function ActivatePrompt()
                     prompt:FireServer()
                 elseif prompt:IsA("ProximityPrompt") then
                     prompt:InputHoldBegin()
-                    wait(0.2)
+                    task.wait(0.2)
                     prompt:InputHoldEnd()
                 elseif prompt:IsA("BoolValue") then
                     prompt.Value = true
@@ -123,14 +132,12 @@ local function IsInsideDeliveryZone()
     return false
 end
 
--- ===== ANTI-AFK MẠNH (nhảy + di chuyển nhẹ) =====
-local function AntiAFK()
+-- ===== CHỐNG KẸT (Unstuck Movement) =====
+local function UnstuckMovement()
     local humanoid = plr.Character and plr.Character:FindFirstChild("Humanoid")
     if humanoid then
-        -- Nhảy
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        wait(0.1)
-        -- Di chuyển nhẹ sang trái/phải để tạo tín hiệu
+        task.wait(0.1)
         local currentPos = rootPart.Position
         local targetPos = currentPos + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
         MoveTo(CFrame.new(targetPos), 100)
@@ -245,7 +252,7 @@ local startTime = nil
 
 -- ===== FARM LOOP =====
 local function FarmLoop()
-    local lastAFKTime = 0
+    local lastStuckCheckTime = 0
     local lastDeliveryTime = 0
     local insideZoneSince = 0
 
@@ -255,14 +262,14 @@ local function FarmLoop()
         local pickupBoxes = GetPickupBoxes()
         if #pickupBoxes == 0 then
             ui.StatusLabel.Text = "⏳ Đợi Boxes..."
-            wait(2)
+            task.wait(2)
         else
             for _, box in ipairs(pickupBoxes) do
                 if not isRunning then break end
                 rootPart.CFrame = box.CFrame + Vector3.new(0, 2, 0)
-                wait(0.3)
+                task.wait(0.3)
                 ActivatePrompt()
-                wait(0.5)
+                task.wait(0.5)
             end
         end
 
@@ -279,14 +286,16 @@ local function FarmLoop()
                 MoveTo(targetCF, 500)
             else
                 ui.DistLabel.Text = "⚠️ Không tìm thấy mũi tên"
-                wait(1)
+                task.wait(1)
             end
             deliveryPoints = GetDeliveryPoints()
-            if tick() - lastAFKTime > 30 then
-                AntiAFK()
-                lastAFKTime = tick()
+            
+            -- Chống kẹt vật lý
+            if tick() - lastStuckCheckTime > 30 then
+                UnstuckMovement()
+                lastStuckCheckTime = tick()
             end
-            wait(0.2)
+            task.wait(0.2)
         end
 
         -- === GIAO HÀNG ===
@@ -307,7 +316,7 @@ local function FarmLoop()
                         local targetPos = arrowCF.Position + lookVec * 500
                         ui.StatusLabel.Text = "🧭 Xa quá, bay trượt theo mũi tên..."
                         MoveTo(CFrame.new(targetPos) + Vector3.new(0, 2, 0), 400)
-                        wait(0.3)
+                        task.wait(0.3)
                     end
                 end
 
@@ -315,7 +324,7 @@ local function FarmLoop()
                 ui.StatusLabel.Text = "⬆️ Bay lên cao..."
                 local highPos = rootPart.Position + Vector3.new(0, 50, 0)
                 MoveTo(CFrame.new(highPos), 300)
-                wait(0.3)
+                task.wait(0.3)
 
                 -- BAY XUỐNG ĐIỂM GIAO
                 ui.StatusLabel.Text = "🚀 Bay vào " .. point.Name
@@ -330,12 +339,12 @@ local function FarmLoop()
                 else
                     ui.StatusLabel.Text = "❌ Lỗi giao: " .. tostring(err)
                 end
-                wait(0.5)
+                task.wait(0.5)
 
-                -- Anti-AFK mỗi 30 giây
-                if tick() - lastAFKTime > 30 then
-                    AntiAFK()
-                    lastAFKTime = tick()
+                -- Chống kẹt vật lý
+                if tick() - lastStuckCheckTime > 30 then
+                    UnstuckMovement()
+                    lastStuckCheckTime = tick()
                 end
             end
 
@@ -348,12 +357,12 @@ local function FarmLoop()
                 -- 1. Bay lên cao 200 stud
                 local highPos = rootPart.Position + Vector3.new(0, 200, 0)
                 MoveTo(CFrame.new(highPos), 300)
-                wait(0.5)
+                task.wait(0.5)
 
                 -- 2. Bay ra khỏi zone (theo trục X)
                 local outPos = rootPart.Position + Vector3.new(200, 0, 0)
                 MoveTo(CFrame.new(outPos), 400)
-                wait(0.5)
+                task.wait(0.5)
 
                 -- 3. Bay vào lại điểm đầu tiên
                 local firstPoint = deliveryPoints[1]
@@ -362,24 +371,24 @@ local function FarmLoop()
                 else
                     MoveTo(CFrame.new(rootPart.Position + Vector3.new(-100, 0, 0)), 400)
                 end
-                wait(1)
+                task.wait(1)
 
                 insideZoneSince = tick()
                 lastDeliveryTime = tick()
                 ui.ResetLabel.Visible = false
                 ui.StatusLabel.Text = "🔄 Đã reset, tiếp tục..."
-                wait(1)
+                task.wait(1)
             end
         end
 
-        wait(1)
+        task.wait(1)
     end
 end
 
 -- ===== CẬP NHẬT TIỀN =====
-spawn(function()
+task.spawn(function()
     while true do
-        wait(2)
+        task.wait(2)
         local leaderstats = plr:FindFirstChild("leaderstats")
         if leaderstats then
             local cash = leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Money") or leaderstats:FindFirstChild("Coins")
@@ -391,7 +400,7 @@ spawn(function()
 end)
 
 -- ===== CẬP NHẬT THỜI GIAN =====
-spawn(function()
+task.spawn(function()
     while true do
         if isRunning and startTime then
             local elapsed = tick() - startTime
@@ -400,7 +409,7 @@ spawn(function()
             local s = math.floor(elapsed % 60)
             ui.TimerLabel.Text = string.format("⏱ %02d:%02d:%02d", h, m, s)
         end
-        wait(1)
+        task.wait(1)
     end
 end)
 
@@ -422,4 +431,4 @@ ui.ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("✅ Auto Farm đã sẵn sàng! (Bay lên cao + Anti-AFK mạnh)")
+print("✅ Auto Farm đã sẵn sàng! (Tích hợp Anti-AFK chống kick 20 phút)")
