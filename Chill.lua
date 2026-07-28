@@ -1,5 +1,5 @@
 -- ============================================
--- AUTO FARM DELIVERY - BAY TRƯỢT THEO HƯỚNG MŨI TÊN
+-- AUTO FARM DELIVERY - BAY LÊN CAO KHI GIAO + RESET
 -- ============================================
 
 local plr = game:GetService("Players").LocalPlayer
@@ -26,7 +26,7 @@ local function MoveTo(targetCFrame, speed)
     tween.Completed:Wait()
 end
 
--- ===== TÌM CFrame CỦA MŨI TÊN (gồm cả hướng) =====
+-- ===== TÌM CFrame CỦA MŨI TÊN =====
 local function GetArrowCFrame()
     local arrowModel = workspace:FindFirstChild("GuideArrowModel")
     if arrowModel then
@@ -36,7 +36,6 @@ local function GetArrowCFrame()
             end
         end
     end
-    -- Tìm bất kỳ Part nào có tên "Arrow" hoặc "Guide"
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and (string.find(obj.Name, "Arrow") or string.find(obj.Name, "Guide")) then
             return obj.CFrame
@@ -107,6 +106,19 @@ local function GetPickupBoxes()
     return boxes
 end
 
+-- ===== KIỂM TRA XE CÓ ĐANG TRONG ZONE KHÔNG =====
+local function IsInsideDeliveryZone()
+    local effects = workspace:FindFirstChild("DeliveryLocationEffects")
+    if not effects then return false end
+    local pos = rootPart.Position
+    for _, part in ipairs(effects:GetChildren()) do
+        if part:IsA("BasePart") and (pos - part.Position).Magnitude < 15 then
+            return true
+        end
+    end
+    return false
+end
+
 -- ===== ANTI-AFK =====
 local function AntiAFK()
     local humanoid = plr.Character and plr.Character:FindFirstChild("Humanoid")
@@ -123,8 +135,8 @@ local function CreateUI()
     screenGui.Parent = plr:WaitForChild("PlayerGui")
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 280, 0, 220)
-    mainFrame.Position = UDim2.new(0, 10, 0.5, -110)
+    mainFrame.Size = UDim2.new(0, 280, 0, 240)
+    mainFrame.Position = UDim2.new(0, 10, 0.5, -120)
     mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     mainFrame.BackgroundTransparency = 0.15
     mainFrame.BorderSizePixel = 0
@@ -191,6 +203,17 @@ local function CreateUI()
     distLabel.Font = Enum.Font.Gotham
     distLabel.Parent = mainFrame
 
+    local resetLabel = Instance.new("TextLabel")
+    resetLabel.Size = UDim2.new(1, 0, 0, 20)
+    resetLabel.Position = UDim2.new(0, 0, 0, 200)
+    resetLabel.BackgroundTransparency = 1
+    resetLabel.Text = "🔄 Đợi reset..."
+    resetLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    resetLabel.TextSize = 12
+    resetLabel.Font = Enum.Font.Gotham
+    resetLabel.Visible = false
+    resetLabel.Parent = mainFrame
+
     return {
         ScreenGui = screenGui,
         MainFrame = mainFrame,
@@ -198,7 +221,8 @@ local function CreateUI()
         ToggleBtn = toggleBtn,
         MoneyLabel = moneyLabel,
         TimerLabel = timerLabel,
-        DistLabel = distLabel
+        DistLabel = distLabel,
+        ResetLabel = resetLabel
     }
 end
 
@@ -212,6 +236,9 @@ local startTime = nil
 -- ===== FARM LOOP =====
 local function FarmLoop()
     local lastAFKTime = 0
+    local lastDeliveryTime = 0
+    local insideZoneSince = 0
+
     while isRunning do
         -- === NHẬN HÀNG ===
         ui.StatusLabel.Text = "📦 Đang nhận hàng..."
@@ -229,27 +256,22 @@ local function FarmLoop()
             end
         end
 
-        -- === BAY TRƯỢT THEO HƯỚNG MŨI TÊN CHO ĐẾN KHI CÓ ĐIỂM GIAO ===
+        -- === BAY TRƯỢT THEO MŨI TÊN KHI CHƯA CÓ ĐIỂM GIAO ===
         local deliveryPoints = GetDeliveryPoints()
         while #deliveryPoints == 0 and isRunning do
             local arrowCF = GetArrowCFrame()
             if arrowCF then
-                -- Lấy hướng nhìn của mũi tên
                 local lookVec = arrowCF.LookVector
-                -- Điểm đích: bay về phía trước theo hướng mũi tên với khoảng cách 500 stud
                 local targetPos = arrowCF.Position + lookVec * 500
                 local targetCF = CFrame.new(targetPos) + Vector3.new(0, 2, 0)
                 local dist = (targetCF.Position - rootPart.Position).Magnitude
                 ui.DistLabel.Text = "📍 Bay trượt theo mũi tên, còn " .. math.floor(dist) .. " stud"
-                -- Bay với tốc độ 500 để đuổi kịp
                 MoveTo(targetCF, 500)
             else
                 ui.DistLabel.Text = "⚠️ Không tìm thấy mũi tên"
                 wait(1)
             end
-            -- Cập nhật điểm giao
             deliveryPoints = GetDeliveryPoints()
-            -- Anti-AFK
             if tick() - lastAFKTime > 60 then
                 AntiAFK()
                 lastAFKTime = tick()
@@ -259,6 +281,11 @@ local function FarmLoop()
 
         -- === GIAO HÀNG ===
         if #deliveryPoints > 0 and isRunning then
+            -- Đánh dấu thời gian vào zone (lần đầu)
+            if insideZoneSince == 0 then
+                insideZoneSince = tick()
+            end
+
             ui.StatusLabel.Text = "🚚 Đang giao (" .. #deliveryPoints .. " điểm)"
             for _, point in ipairs(deliveryPoints) do
                 if not isRunning then break end
@@ -266,7 +293,7 @@ local function FarmLoop()
                 local dist = (targetCF.Position - rootPart.Position).Magnitude
                 ui.DistLabel.Text = "📍 Cách điểm giao " .. math.floor(dist) .. " stud"
 
-                -- Nếu xa quá, bay trượt theo mũi tên trước một chút
+                -- Nếu xa quá, bay trượt theo mũi tên trước
                 if dist > 1500 then
                     local arrowCF = GetArrowCFrame()
                     if arrowCF then
@@ -278,7 +305,13 @@ local function FarmLoop()
                     end
                 end
 
-                -- Bay vào điểm giao
+                -- === BAY LÊN CAO TRƯỚC KHI VÀO ĐIỂM GIAO ===
+                ui.StatusLabel.Text = "⬆️ Bay lên cao..."
+                local highPos = rootPart.Position + Vector3.new(0, 50, 0)  -- bay lên 50 stud
+                MoveTo(CFrame.new(highPos), 300)
+                wait(0.3)
+
+                -- === BAY XUỐNG ĐIỂM GIAO ===
                 ui.StatusLabel.Text = "🚀 Bay vào " .. point.Name
                 MoveTo(targetCF, 300)
 
@@ -288,10 +321,45 @@ local function FarmLoop()
                 end)
                 if success then
                     ui.StatusLabel.Text = "✅ Giao tại " .. point.Name
+                    lastDeliveryTime = tick()
                 else
                     ui.StatusLabel.Text = "❌ Lỗi giao"
                 end
                 wait(0.5)
+            end
+
+            -- === KIỂM TRA KẸT: Nếu đứng trong zone >5s mà không có điểm mới ===
+            local timeSinceLastDelivery = tick() - lastDeliveryTime
+            if timeSinceLastDelivery > 5 and IsInsideDeliveryZone() and #deliveryPoints > 0 then
+                ui.ResetLabel.Visible = true
+                ui.StatusLabel.Text = "🔄 Kẹt quá 5s, reset zone..."
+
+                -- 1. Bay lên cao
+                local highPos = rootPart.Position + Vector3.new(0, 200, 0)
+                MoveTo(CFrame.new(highPos), 300)
+                wait(0.5)
+
+                -- 2. Bay ra khỏi zone (theo hướng ngẫu nhiên hoặc ra xa)
+                local outPos = rootPart.Position + Vector3.new(200, 0, 0)
+                MoveTo(CFrame.new(outPos), 400)
+                wait(0.5)
+
+                -- 3. Bay vào lại zone (điểm giao đầu tiên)
+                local firstPoint = deliveryPoints[1]
+                if firstPoint then
+                    MoveTo(firstPoint.CFrame + Vector3.new(0, 2, 0), 400)
+                else
+                    -- fallback: bay về vị trí cũ
+                    MoveTo(CFrame.new(rootPart.Position + Vector3.new(-100, 0, 0)), 400)
+                end
+                wait(1)
+
+                -- Reset thời gian
+                insideZoneSince = tick()
+                lastDeliveryTime = tick()
+                ui.ResetLabel.Visible = false
+                ui.StatusLabel.Text = "🔄 Đã reset zone, tiếp tục..."
+                wait(1)
             end
         end
 
@@ -351,4 +419,4 @@ ui.ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("✅ Auto Farm UI đã sẵn sàng! (Bay trượt theo hướng mũi tên)")
+print("✅ Auto Farm UI đã sẵn sàng! (Bay lên cao khi giao và reset zone)")
