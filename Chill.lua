@@ -1,10 +1,14 @@
--- ============================================
--- AUTO FARM DELIVERY - BAY LÊN CAO KHI GIAO + RESET
--- ============================================
+-- ===================================================
+-- AUTO FARM DELIVERY – BAY LÊN CAO + RESET + ANTI-AFK
+-- ===================================================
+-- HƯỚNG DẪN: Copy toàn bộ, dán vào Executor, chạy.
+-- UI hiện ra góc trái, bấm "Bắt đầu" để chạy.
+-- ===================================================
 
 local plr = game:GetService("Players").LocalPlayer
 local tweenService = game:GetService("TweenService")
 local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
 
 local char = plr.Character
 if not char or not char.Parent then return end
@@ -13,12 +17,12 @@ if not rootPart then return end
 
 local remoteGiao = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("DeliveryLocationInteracted")
 
--- ===== HÀM DI CHUYỂN =====
+-- ===== HÀM DI CHUYỂN BẰNG TWEEN =====
 local function MoveTo(targetCFrame, speed)
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
-    if distance < 0.5 then 
+    if distance < 0.5 then
         rootPart.CFrame = targetCFrame
-        return 
+        return
     end
     local duration = distance / speed
     local tween = tweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
@@ -26,7 +30,7 @@ local function MoveTo(targetCFrame, speed)
     tween.Completed:Wait()
 end
 
--- ===== TÌM CFrame CỦA MŨI TÊN =====
+-- ===== TÌM MŨI TÊN =====
 local function GetArrowCFrame()
     local arrowModel = workspace:FindFirstChild("GuideArrowModel")
     if arrowModel then
@@ -106,7 +110,7 @@ local function GetPickupBoxes()
     return boxes
 end
 
--- ===== KIỂM TRA XE CÓ ĐANG TRONG ZONE KHÔNG =====
+-- ===== KIỂM TRA XE CÓ TRONG ZONE KHÔNG =====
 local function IsInsideDeliveryZone()
     local effects = workspace:FindFirstChild("DeliveryLocationEffects")
     if not effects then return false end
@@ -119,11 +123,17 @@ local function IsInsideDeliveryZone()
     return false
 end
 
--- ===== ANTI-AFK =====
+-- ===== ANTI-AFK MẠNH (nhảy + di chuyển nhẹ) =====
 local function AntiAFK()
     local humanoid = plr.Character and plr.Character:FindFirstChild("Humanoid")
     if humanoid then
+        -- Nhảy
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        wait(0.1)
+        -- Di chuyển nhẹ sang trái/phải để tạo tín hiệu
+        local currentPos = rootPart.Position
+        local targetPos = currentPos + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+        MoveTo(CFrame.new(targetPos), 100)
     end
 end
 
@@ -135,10 +145,10 @@ local function CreateUI()
     screenGui.Parent = plr:WaitForChild("PlayerGui")
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 280, 0, 240)
-    mainFrame.Position = UDim2.new(0, 10, 0.5, -120)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    mainFrame.BackgroundTransparency = 0.15
+    mainFrame.Size = UDim2.new(0, 280, 0, 250)
+    mainFrame.Position = UDim2.new(0, 10, 0.5, -125)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    mainFrame.BackgroundTransparency = 0.2
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
@@ -256,7 +266,7 @@ local function FarmLoop()
             end
         end
 
-        -- === BAY TRƯỢT THEO MŨI TÊN KHI CHƯA CÓ ĐIỂM GIAO ===
+        -- === BAY THEO MŨI TÊN KHI CHƯA CÓ ĐIỂM GIAO ===
         local deliveryPoints = GetDeliveryPoints()
         while #deliveryPoints == 0 and isRunning do
             local arrowCF = GetArrowCFrame()
@@ -272,7 +282,7 @@ local function FarmLoop()
                 wait(1)
             end
             deliveryPoints = GetDeliveryPoints()
-            if tick() - lastAFKTime > 60 then
+            if tick() - lastAFKTime > 30 then
                 AntiAFK()
                 lastAFKTime = tick()
             end
@@ -281,10 +291,7 @@ local function FarmLoop()
 
         -- === GIAO HÀNG ===
         if #deliveryPoints > 0 and isRunning then
-            -- Đánh dấu thời gian vào zone (lần đầu)
-            if insideZoneSince == 0 then
-                insideZoneSince = tick()
-            end
+            if insideZoneSince == 0 then insideZoneSince = tick() end
 
             ui.StatusLabel.Text = "🚚 Đang giao (" .. #deliveryPoints .. " điểm)"
             for _, point in ipairs(deliveryPoints) do
@@ -293,7 +300,6 @@ local function FarmLoop()
                 local dist = (targetCF.Position - rootPart.Position).Magnitude
                 ui.DistLabel.Text = "📍 Cách điểm giao " .. math.floor(dist) .. " stud"
 
-                -- Nếu xa quá, bay trượt theo mũi tên trước
                 if dist > 1500 then
                     local arrowCF = GetArrowCFrame()
                     if arrowCF then
@@ -305,17 +311,16 @@ local function FarmLoop()
                     end
                 end
 
-                -- === BAY LÊN CAO TRƯỚC KHI VÀO ĐIỂM GIAO ===
+                -- BAY LÊN CAO TRƯỚC KHI VÀO ĐIỂM
                 ui.StatusLabel.Text = "⬆️ Bay lên cao..."
-                local highPos = rootPart.Position + Vector3.new(0, 50, 0)  -- bay lên 50 stud
+                local highPos = rootPart.Position + Vector3.new(0, 50, 0)
                 MoveTo(CFrame.new(highPos), 300)
                 wait(0.3)
 
-                -- === BAY XUỐNG ĐIỂM GIAO ===
+                -- BAY XUỐNG ĐIỂM GIAO
                 ui.StatusLabel.Text = "🚀 Bay vào " .. point.Name
                 MoveTo(targetCF, 300)
 
-                -- Gửi remote
                 local success, err = pcall(function()
                     remoteGiao:FireServer(point)
                 end)
@@ -323,50 +328,48 @@ local function FarmLoop()
                     ui.StatusLabel.Text = "✅ Giao tại " .. point.Name
                     lastDeliveryTime = tick()
                 else
-                    ui.StatusLabel.Text = "❌ Lỗi giao"
+                    ui.StatusLabel.Text = "❌ Lỗi giao: " .. tostring(err)
                 end
                 wait(0.5)
+
+                -- Anti-AFK mỗi 30 giây
+                if tick() - lastAFKTime > 30 then
+                    AntiAFK()
+                    lastAFKTime = tick()
+                end
             end
 
-            -- === KIỂM TRA KẸT: Nếu đứng trong zone >5s mà không có điểm mới ===
+            -- === KIỂM TRA KẸT (5s) ===
             local timeSinceLastDelivery = tick() - lastDeliveryTime
             if timeSinceLastDelivery > 5 and IsInsideDeliveryZone() and #deliveryPoints > 0 then
                 ui.ResetLabel.Visible = true
                 ui.StatusLabel.Text = "🔄 Kẹt quá 5s, reset zone..."
 
-                -- 1. Bay lên cao
+                -- 1. Bay lên cao 200 stud
                 local highPos = rootPart.Position + Vector3.new(0, 200, 0)
                 MoveTo(CFrame.new(highPos), 300)
                 wait(0.5)
 
-                -- 2. Bay ra khỏi zone (theo hướng ngẫu nhiên hoặc ra xa)
+                -- 2. Bay ra khỏi zone (theo trục X)
                 local outPos = rootPart.Position + Vector3.new(200, 0, 0)
                 MoveTo(CFrame.new(outPos), 400)
                 wait(0.5)
 
-                -- 3. Bay vào lại zone (điểm giao đầu tiên)
+                -- 3. Bay vào lại điểm đầu tiên
                 local firstPoint = deliveryPoints[1]
                 if firstPoint then
                     MoveTo(firstPoint.CFrame + Vector3.new(0, 2, 0), 400)
                 else
-                    -- fallback: bay về vị trí cũ
                     MoveTo(CFrame.new(rootPart.Position + Vector3.new(-100, 0, 0)), 400)
                 end
                 wait(1)
 
-                -- Reset thời gian
                 insideZoneSince = tick()
                 lastDeliveryTime = tick()
                 ui.ResetLabel.Visible = false
-                ui.StatusLabel.Text = "🔄 Đã reset zone, tiếp tục..."
+                ui.StatusLabel.Text = "🔄 Đã reset, tiếp tục..."
                 wait(1)
             end
-        end
-
-        -- Anti-AFK
-        if tick() - lastAFKTime > 60 then
-            AntiAFK()
-            lastAFKTime = tick()
         end
 
         wait(1)
@@ -392,10 +395,10 @@ spawn(function()
     while true do
         if isRunning and startTime then
             local elapsed = tick() - startTime
-            local hours = math.floor(elapsed / 3600)
-            local minutes = math.floor((elapsed % 3600) / 60)
-            local seconds = math.floor(elapsed % 60)
-            ui.TimerLabel.Text = string.format("⏱ %02d:%02d:%02d", hours, minutes, seconds)
+            local h = math.floor(elapsed / 3600)
+            local m = math.floor((elapsed % 3600) / 60)
+            local s = math.floor(elapsed % 60)
+            ui.TimerLabel.Text = string.format("⏱ %02d:%02d:%02d", h, m, s)
         end
         wait(1)
     end
@@ -419,4 +422,4 @@ ui.ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("✅ Auto Farm UI đã sẵn sàng! (Bay lên cao khi giao và reset zone)")
+print("✅ Auto Farm đã sẵn sàng! (Bay lên cao + Anti-AFK mạnh)")
