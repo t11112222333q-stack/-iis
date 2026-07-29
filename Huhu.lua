@@ -1,10 +1,10 @@
 --[[
-	MEMAYBEO HUB - AUTO BUST ATM (LOCKED CAM + 4S WAIT + AUTO EVADE PLAYERS)
+	MEMAYBEO HUB - AUTO BUST ATM (LOCKED CAM + 4S SKY WAIT + ANTI-SEAT + AUTO EVADE PLAYERS)
 	- Khóa cứng Camera vào ProximityPrompt liên tục trong suốt quá trình cạy.
-	- Đợi đúng 4s sau khi phá xong rồi mới tele sang cây ATM khác.
-	- TÍNH NĂNG MỚI: Tự động quét phát hiện người chơi/Police lại gần trong bán kính (Range).
+	- NÂNG CẤP: Chống vô tình ngồi vào ghế/xe (Anti-Seat / Humanoid.Sit = false).
+	- NÂNG CẤP: Trong 4 giây chờ sau khi cạy xong, nhân vật sẽ tự động bay lên trời (200 studs) né gank thay vì đứng yên dưới đất.
+	- TÍNH NĂNG RADAR: Tự động quét phát hiện người chơi/Police lại gần trong bán kính (Range).
 	  Nếu có người tới gần -> Lập tức Teleport né sang cây ATM khác ngay lập tức!
-	- Khi hết ATM: Bay dạo quanh map ở độ cao 200 stud né Police.
 ]]
 
 local Players = game:GetService("Players")
@@ -22,6 +22,7 @@ local Config = {
     TargetFOV = 120,
     EvadePlayers = true,   -- Bật/tắt né người lại gần
     EvadeRadius = 25.0,    -- Bán kính phát hiện (studs)
+    AntiSeat = true,       -- Bật chống ngồi ghế
 }
 
 -- TỌA ĐỘ VIP BẠN YÊU CẦU
@@ -43,7 +44,20 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
---// ANTI-AFK
+--// CHỐNG NGỒI GHẾ (ANTI-SEAT) & ANTI-AFK
+RunService.Stepped:Connect(function()
+    if Config.AntiSeat or Config.AutoBust then
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Sit then
+                hum.Sit = false
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+        end
+    end
+end)
+
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
@@ -135,6 +149,18 @@ local function TeleportToATM(atm)
     return false
 end
 
+--// CHẾ ĐỘ BAY LÊN KHÔNG TRUNG NÉ TRÁNH NGUY HIỂM (200 STUDS)
+local function FlyToSky()
+    CurrentAimTarget = nil
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local pos = hrp.Position
+        hrp.CFrame = CFrame.new(pos.X, 200, pos.Z)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
 --// CHẾ ĐỘ BAY QUANH MAP NÉ POLICE
 local function PatrolAroundMap()
     CurrentAimTarget = nil
@@ -175,10 +201,10 @@ local function CreateUI()
 
     local Title = Instance.new("TextLabel", Frame)
     Title.Size = UDim2.new(1, 0, 0, 30)
-    Title.Text = "🏧 AUTO ATM (RADAR EVADE)"
+    Title.Text = "🏧 AUTO ATM (SKY WAIT + ANTI-SEAT)"
     Title.TextColor3 = Color3.fromRGB(255, 200, 50)
     Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 13
+    Title.TextSize = 11
     Title.BackgroundTransparency = 1
 
     local ATMCount = Instance.new("TextLabel", Frame)
@@ -287,7 +313,7 @@ local function CreateUI()
     local EvadeBtn = Instance.new("TextButton", Frame)
     EvadeBtn.Size = UDim2.new(0.85, 0, 0, 24)
     EvadeBtn.Position = UDim2.new(0.075, 0, 0.32, 0)
-    EvadeBtn.Text = "🛡️ NE NGƯỜI LẠI GẦN: ON"
+    EvadeBtn.Text = "🛡️ NÉ NGƯỜI LẠI GẦN: ON"
     EvadeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     EvadeBtn.Font = Enum.Font.GothamBold
     EvadeBtn.TextSize = 10
@@ -296,7 +322,7 @@ local function CreateUI()
 
     EvadeBtn.MouseButton1Click:Connect(function()
         Config.EvadePlayers = not Config.EvadePlayers
-        EvadeBtn.Text = Config.EvadePlayers and "🛡️ NE NGƯỜI LẠI GẦN: ON" or "🛡️ NE NGƯỜI LẠI GẦN: OFF"
+        EvadeBtn.Text = Config.EvadePlayers and "🛡️ NÉ NGƯỜI LẠI GẦN: ON" or "🛡️ NÉ NGƯỜI LẠI GẦN: OFF"
         EvadeBtn.BackgroundColor3 = Config.EvadePlayers and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(80, 80, 90)
     end)
 
@@ -429,11 +455,11 @@ task.spawn(function()
     end
 end)
 
---// AUTO LOOP (TÍCH HỢP QUÉT VÀ NÉ NGƯỜI TẠI CHỖ)
+--// AUTO LOOP (TÍCH HỢP BAY LÊN TRỜI TRONG 4S CHỜ VÀ NÉ NGƯỜI CHIẾN THUẬT)
 task.spawn(function()
     while task.wait(0.1) do
         if Config.AutoBust then
-            -- Kiểm tra ngay nếu đang có người ở gần trước khi chọn ATM
+            -- Kiểm tra nếu đang có người ở gần trước khi chọn ATM
             local isNearby, pName, dist = IsPlayerNearby()
             if isNearby then
                 CurrentAimTarget = nil
@@ -463,33 +489,26 @@ task.spawn(function()
                             timeHeld = timeHeld + 0.1
 
                             -- QUÉT XUNG QUANH LIÊN TỤC TRONG LÚC ĐANG CẠY
-                            local hasPlayer, enemyName, enemyDist = IsPlayerNearby()
+                            local hasPlayer = IsPlayerNearby()
                             if hasPlayer then
-                                -- THẢ NÚT VÀ CHẠY NGAY TẬP TỨC
                                 pcall(function() prompt:InputHoldEnd() end)
                                 CurrentAimTarget = nil
-                                BustedATMs[atm] = true -- Bỏ qua cây này tạm thời
+                                BustedATMs[atm] = true
                                 interruptedByPlayer = true
                                 break
                             end
                         end
                         
-                        -- Nếu bị ngắt bởi người chơi -> Nhảy sang vòng lặp kế tiếp để Tele sang ATM khác ngay
                         if interruptedByPlayer then
-                            local nextATM = GetNearestATM()
-                            if nextATM then
-                                TeleportToATM(nextATM)
-                            else
-                                PatrolAroundMap()
-                            end
-                            task.wait(0.2)
+                            FlyToSky()
+                            task.wait(0.5)
                         else
-                            -- THẢ NÚT BÌNH THƯỜNG
+                            -- THẢ NÚT BÌNH THƯỜNG DÒNG LỆNH CẠY XONG
                             pcall(function() prompt:InputHoldEnd() end)
                             
-                            CurrentAimTarget = nil
+                            -- ĐÃ PHÁ XONG: BAY LÊN TRỜI VÀ ĐỢI 4 GIÂY ĐỂ TRÁNH ĐỨNG DƯỚI ĐẤT
+                            FlyToSky()
                             
-                            -- Đợi 4s nhưng vẫn liên tục quét nếu có người tới gần trong lúc chờ thì té luôn
                             local waitTime = 0
                             while waitTime < 4.0 and Config.AutoBust do
                                 task.wait(0.1)
@@ -513,5 +532,4 @@ task.spawn(function()
     end
 end)
 
-print("🔥 MEMAYBEO HUB - AUTO ATM WITH PLAYER EVADE RADAR READY!")
-
+print("🔥 MEMAYBEO HUB - AUTO ATM WITH SKY WAIT & ANTI-SEAT READY!")
