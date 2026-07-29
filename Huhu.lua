@@ -1,7 +1,8 @@
 --[[
-	MEMAYBEO HUB - AUTO BUST ATM (VIP FAST FLY + SKY WAIT + ANTI-SEAT + AUTO EVADE)
-	- BẢN CẬP NHẬT TỐI THƯỢNG: Bay siêu tốc trên trời cao (Tránh tòa nhà).
-	- Đủ 10 ATM -> Bay về bãi VIP -> Đợi 3s -> Nhảy 1 cái chống lỗi -> Đi cày tiếp.
+	MEMAYBEO HUB - AUTO BUST ATM (LOCKED CAM + SKY WAIT + ANTI-SEAT + AUTO EVADE)
+	- BẢN CẬP NHẬT VIP: 
+	  + Đi farm ATM: Dùng Teleport tức thời (như cũ).
+	  + Đủ 10 ATM: Dùng Fast Fly (Bay siêu tốc trên trời cao) về bãi VIP đợi 3s rồi nhảy 1 cái để chống lỗi.
 ]]
 
 local Players = game:GetService("Players")
@@ -131,8 +132,37 @@ local function GetNearestATM()
     return nearest
 end
 
+--// TELEPORT TỨC THỜI ĐẾN ATM (NHƯ CŨ)
+local function TeleportToATM(atm)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and atm then
+        local targetPos = GetATMPosition(atm) + Vector3.new(0, 2, 0)
+        hrp.CFrame = CFrame.new(targetPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        
+        local prompt = atm:FindFirstChildWhichIsA("ProximityPrompt", true)
+        CurrentAimTarget = (prompt and prompt.Parent and prompt.Parent:IsA("BasePart")) and prompt.Parent.Position or targetPos
+        
+        return true
+    end
+    return false
+end
+
+--// DỊCH CHUYỂN NHANH LÊN TRỜI (NHƯ CŨ)
+local function FlyToSky()
+    CurrentAimTarget = nil
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local pos = hrp.Position
+        hrp.CFrame = CFrame.new(pos.X, 200, pos.Z)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
 --// =================================================================
---// HỆ THỐNG BAY SIÊU TỐC TRÊN CAO (XUYÊN TƯỜNG + TRÁNH OBSTACLES)
+--// CHỈ DÙNG ĐỂ BAY VỀ TỌA ĐỘ VIP (FAST FLY XUYÊN TƯỜNG)
 --// =================================================================
 local function FastFly(targetCFrame)
     local char = LocalPlayer.Character
@@ -141,9 +171,9 @@ local function FastFly(targetCFrame)
     
     CurrentAimTarget = nil
     local flySpeed = 700 -- Tốc độ bay (studs/s) - Cực nhanh
-    local flyHeight = 400 -- Bay tuốt lên cao 400 studs để né mọi loại địa hình
+    local flyHeight = 400 -- Bay lên cao 400 studs để né địa hình
     
-    -- Bật noclip để không vướng tường khi cất/hạ cánh
+    -- Bật noclip để không vướng tường khi bay
     local noclipConnection = RunService.Stepped:Connect(function()
         if char then
             for _, p in ipairs(char:GetDescendants()) do
@@ -157,7 +187,7 @@ local function FastFly(targetCFrame)
     local function doTween(pos)
         local dist = (hrp.Position - pos).Magnitude
         local t = dist / flySpeed
-        if t < 0.05 then t = 0.05 end -- Tránh lỗi chia 0
+        if t < 0.05 then t = 0.05 end 
         local tw = TweenService:Create(hrp, TweenInfo.new(t, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos)})
         tw:Play()
         tw.Completed:Wait()
@@ -168,10 +198,10 @@ local function FastFly(targetCFrame)
     -- 1. Bốc đầu bay thẳng đứng lên trời
     doTween(Vector3.new(hrp.Position.X, flyHeight, hrp.Position.Z))
     
-    -- 2. Bay ngang trên không tới phía trên mục tiêu
+    -- 2. Bay ngang trên không tới phía trên mục tiêu VIP
     doTween(Vector3.new(targetCFrame.X, flyHeight, targetCFrame.Z))
     
-    -- 3. Đáp thẳng xuống mục tiêu (sử dụng CFrame gốc để lấy luôn góc quay)
+    -- 3. Cắm thẳng xuống mục tiêu VIP (Giữ nguyên góc quay của CFrame)
     local finalDist = (hrp.Position - targetCFrame.Position).Magnitude
     local finalT = finalDist / flySpeed
     if finalT < 0.05 then finalT = 0.05 end
@@ -180,31 +210,20 @@ local function FastFly(targetCFrame)
     finalTw.Completed:Wait()
     
     hrp.AssemblyLinearVelocity = Vector3.zero
-    noclipConnection:Disconnect() -- Tắt Noclip khi đã hạ cánh an toàn
+    noclipConnection:Disconnect()
 end
 
---// BAY LÊN KHÔNG TRUNG ĐỂ CHỜ TRÁNH CẢNH SÁT (TWEEN MƯỢT)
-local function FlyToSky()
-    CurrentAimTarget = nil
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        local tw = TweenService:Create(hrp, TweenInfo.new(0.4, Enum.EasingStyle.Linear), {CFrame = CFrame.new(hrp.Position.X, 350, hrp.Position.Z)})
-        tw:Play()
-    end
-end
-
---// CHẾ ĐỘ TUẦN TRA TRÊN TRỜI NẾU CÓ NGƯỜI
+--// CHẾ ĐỘ BAY QUANH MAP NÉ POLICE NẾU CÓ NGƯỜI
 local function PatrolAroundMap()
     CurrentAimTarget = nil
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
         local timeSec = tick()
-        local speed = 1.2 
-        local mapRadiusX = 1000
-        local mapRadiusZ = 1000
-        local flyHeight = 350
+        local speed = 0.8 
+        local mapRadiusX = 1200
+        local mapRadiusZ = 1200
+        local flyHeight = 200
         
         local x = math.cos(timeSec * speed) * mapRadiusX
         local z = math.sin(timeSec * speed) * mapRadiusZ
@@ -234,7 +253,7 @@ local function CreateUI()
 
     local Title = Instance.new("TextLabel", Frame)
     Title.Size = UDim2.new(1, 0, 0, 30)
-    Title.Text = "🏧 AUTO ATM (FAST FLY + JUMP)"
+    Title.Text = "🏧 AUTO ATM (MIXED TELEPORT & FLY)"
     Title.TextColor3 = Color3.fromRGB(255, 200, 50)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 11
@@ -379,7 +398,7 @@ local function CreateUI()
     local TeleportBtn = Instance.new("TextButton", Frame)
     TeleportBtn.Size = UDim2.new(0.42, 0, 0, 24)
     TeleportBtn.Position = UDim2.new(0.075, 0, 0.54, 0)
-    TeleportBtn.Text = "📍 Bay tới ATM"
+    TeleportBtn.Text = "📍 Tele tới ATM"
     TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     TeleportBtn.Font = Enum.Font.GothamBold
     TeleportBtn.TextSize = 10
@@ -428,14 +447,14 @@ local function CreateUI()
     TeleportBtn.MouseButton1Click:Connect(function()
         local nearest = GetNearestATM()
         if nearest then 
-            FastFly(CFrame.new(GetATMPosition(nearest) + Vector3.new(0, 2, 0)))
+            TeleportToATM(nearest) -- ATM thì dịch chuyển tức thời
         end
     end)
 
     TeleCoordBtn.MouseButton1Click:Connect(function()
         StatusLabel.Text = "🚀 Đang cất cánh về VIP..."
         StatusLabel.TextColor3 = Color3.fromRGB(180, 100, 255)
-        FastFly(TARGET_COORD)
+        FastFly(TARGET_COORD) -- Về VIP thì dùng Fast Fly
         StatusLabel.Text = "📍 Đã bay tới tọa độ VIP!"
     end)
 
@@ -484,7 +503,7 @@ task.spawn(function()
     end
 end)
 
---// AUTO LOOP (FLY FAST + VIP 10 ATMs + JUMP LOGIC)
+--// AUTO LOOP (TELEPORT ATM + FAST FLY VIP + JUMP LOGIC)
 task.spawn(function()
     while task.wait(0.1) do
         if Config.AutoBust then
@@ -497,9 +516,9 @@ task.spawn(function()
             else
                 local atm = GetNearestATM()
                 if atm then
-                    -- THAY VÌ TELEPORT, DÙNG HỆ THỐNG BAY CẤT CÁNH
-                    FastFly(CFrame.new(GetATMPosition(atm) + Vector3.new(0, 2, 0)))
-                    task.wait(0.1)
+                    -- TELEPORT TỨC THỜI TỚI ATM NHƯ CŨ
+                    TeleportToATM(atm)
+                    task.wait(0.1) 
 
                     local prompt = atm:FindFirstChildWhichIsA("ProximityPrompt", true)
                     if prompt and prompt.Enabled then
@@ -529,7 +548,7 @@ task.spawn(function()
                         end
                         
                         if interruptedByPlayer then
-                            FlyToSky()
+                            FlyToSky() -- Dịch chuyển tức thời lên 200 studs
                             task.wait(0.5)
                         else
                             -- ĐÃ PHÁ XONG THÀNH CÔNG
@@ -537,11 +556,11 @@ task.spawn(function()
                             BustedATMs[atm] = true
                             ATMsBustedCount = ATMsBustedCount + 1 
                             
-                            FlyToSky() -- Vừa bẻ khóa xong vọt thẳng lên 350 studs cho an toàn
+                            FlyToSky() -- Vừa bẻ khóa xong dịch chuyển tức thời lên trời 200 studs
                             
-                            -- KIỂM TRA: NẾU ĐỦ 10 ATM THÌ BAY VỀ VIP
+                            -- KIỂM TRA: NẾU ĐỦ 10 ATM THÌ DÙNG FAST FLY BAY VỀ VIP
                             if ATMsBustedCount >= 10 then
-                                -- Bốc đầu bay thẳng đến bãi VIP
+                                -- Dùng Fast Fly xuyên tường bay về VIP 
                                 FastFly(TARGET_COORD)
                                 
                                 local char = LocalPlayer.Character
@@ -580,4 +599,4 @@ task.spawn(function()
     end
 end)
 
-print("🔥 MEMAYBEO HUB - FAST FLY VIP LOGIC LOADED!")
+print("🔥 MEMAYBEO HUB - AUTO ATM (TELEPORT ATM + FAST FLY VIP) LOADED!")
