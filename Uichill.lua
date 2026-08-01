@@ -1,5 +1,5 @@
 -- ====================================================================
--- MEMAYBEO HUB v12.0 (APEX TIER - SETTINGS ONLY)
+-- MEMAYBEO HUB v12.0 (APEX TIER - SETTINGS ONLY UI LIBRARY)
 -- ====================================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -318,16 +318,14 @@ NotifLayout.Parent = NotifContainer
 local function Notify(title, text, duration)
     duration = duration or 3 -- Mặc định hiện 3 giây
     
-    -- Khung bảo vệ (Đứng im trong Layout)
     local Holder = Instance.new("Frame")
     Holder.Size = UDim2.new(1, 0, 0, 60)
     Holder.BackgroundTransparency = 1
     Holder.Parent = NotifContainer
 
-    -- Khung Toast (Sẽ trượt từ ngoài vào trong Holder)
     local Toast = Instance.new("Frame")
     Toast.Size = UDim2.new(1, 0, 1, 0)
-    Toast.Position = UDim2.new(1, 60, 0, 0) -- Bắt đầu ở bên phải ngoài màn hình
+    Toast.Position = UDim2.new(1, 60, 0, 0) 
     Toast.BackgroundColor3 = Color3.fromRGB(15, 20, 18)
     Toast.BackgroundTransparency = 0.1
     Toast.ClipsDescendants = true
@@ -339,7 +337,6 @@ local function Notify(title, text, duration)
     NStroke.Thickness = 1
     NStroke.Transparency = 0.5
 
-    -- Icon viền trái
     local NIcon = Instance.new("Frame")
     NIcon.Size = UDim2.new(0, 4, 1, -20)
     NIcon.Position = UDim2.new(0, 10, 0, 10)
@@ -347,7 +344,6 @@ local function Notify(title, text, duration)
     Instance.new("UICorner", NIcon).CornerRadius = UDim.new(1, 0)
     NIcon.Parent = Toast
 
-    -- Thanh chạy thời gian (Progress Bar) ở đáy
     local ProgressBar = Instance.new("Frame")
     ProgressBar.Size = UDim2.new(1, 0, 0, 3)
     ProgressBar.Position = UDim2.new(0, 0, 1, -3)
@@ -375,12 +371,9 @@ local function Notify(title, text, duration)
     NDesc.TextSize = 11
     NDesc.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- TRƯỢT VÀO
     TweenService:Create(Toast, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-    -- THANH TIẾN ĐỘ CHẠY LÙI
     TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 3)}):Play()
 
-    -- TRƯỢT RA SAU KHI HẾT GIỜ
     task.delay(duration, function()
         local tweenOut = TweenService:Create(Toast, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2.new(1, 60, 0, 0), BackgroundTransparency = 1})
         tweenOut:Play()
@@ -478,7 +471,6 @@ local function CreateTab(tabName)
         SecFrame.UIStroke.Transparency = 0.9
         SecFrame.Parent = TabPage
 
-        -- TÁCH TIÊU ĐỀ
         local SecTitle = Instance.new("TextLabel")
         SecTitle.Size = UDim2.new(1, -20, 0, 30)
         SecTitle.Position = UDim2.new(0, 10, 0, 0)
@@ -498,7 +490,6 @@ local function CreateTab(tabName)
         SecLine.BorderSizePixel = 0
         SecLine.Parent = SecFrame
 
-        -- HỘP CHỨA NÚT
         local ItemContainer = Instance.new("Frame")
         ItemContainer.Size = UDim2.new(1, 0, 1, -31)
         ItemContainer.Position = UDim2.new(0, 0, 0, 31)
@@ -837,7 +828,7 @@ local function CreateTab(tabName)
 end
 
 -- ====================================================================
--- 7. KHỞI TẠO TÍNH NĂNG CHÍNH
+-- 7. TỰ ĐỘNG KHỞI TẠO NẾU CHẠY TRỰC TIẾP
 -- ====================================================================
 
 local TabSettings = CreateTab("Settings")
@@ -853,3 +844,10 @@ end)
 task.wait(1)
 Notify("Memaybeo Premium", "Welcome, " .. LocalPlayer.DisplayName .. "!\nMenu loaded successfully.", 4)
 
+-- ====================================================================
+-- 8. XUẤT THƯ VIỆN BÊN NGOÀI CHO LOADSTRING
+-- ====================================================================
+return {
+    CreateTab = CreateTab,
+    Notify = Notify
+}
