@@ -1,6 +1,5 @@
--- ====================================================================
--- MEMAYBEO HUB v12.0 (MAIN SCRIPT + INDESTRUCTIBLE LOGO FIX)
--- ====================================================================
+-- This file was generated at discord.gg/syncrypt
+-- MEMAYBEO HUB v12.0 (MAIN SCRIPT + ANIMATED LOGO FIX + SOUND LOUDER)
 
 local t1 = {}
 local v2 = unpack or table.unpack
@@ -137,13 +136,29 @@ t3[2] = {
 local UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/t11112222333q-stack/-iis/refs/heads/main/Uichill.lua"))()
 
 -- ====================================================================
--- INDESTRUCTIBLE LOGO TOGGLE (FIXED DECAL BLACK SCREEN)
+-- INDESTRUCTIBLE LOGO TOGGLE (ANIMATED LOGO FIX)
 -- ====================================================================
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local LogoName = "AbsoluteUnkillableLogo"
+
+-- ====================================================================
+-- [MỚI] HỆ THỐNG ÂM THANH KHI TẮT/BẬT
+-- ====================================================================
+local clickSound = Instance.new("Sound")
+clickSound.Name = "ToggleSoundFX"
+clickSound.SoundId = "rbxassetid://140028279221307"
+clickSound.Volume = 10 -- ĐÃ TĂNG MAX ÂM LƯỢNG (CŨ LÀ 3)
+clickSound.Parent = CoreGui
+
+local function PlayClickSound()
+    pcall(function()
+        clickSound:Play()
+    end)
+end
+-- ====================================================================
 
 -- Hàm tạo và bảo vệ Logo
 local function CreateIndestructibleLogo()
@@ -165,10 +180,6 @@ local function CreateIndestructibleLogo()
     LogoButton.Size = UDim2.new(0, 50, 0, 50)
     LogoButton.Position = UDim2.new(0.5, -25, 0, 20)
     LogoButton.BackgroundColor3 = Color3.fromRGB(15, 20, 18)
-    
-    -- ÉP LOAD ẢNH BẰNG RBXTHUMB ĐỂ VƯỢT LỖI DECAL ID ĐEN THUI
-    LogoButton.Image = "rbxthumb://type=Asset&id=89771967787205&w=150&h=150" 
-    
     LogoButton.ZIndex = 2147483647
     LogoButton.Parent = LogoScreen
 
@@ -177,6 +188,29 @@ local function CreateIndestructibleLogo()
     local stroke = Instance.new("UIStroke", LogoButton)
     stroke.Color = Color3.fromRGB(0, 255, 170)
     stroke.Thickness = 2.5
+
+    -- ====================================================================
+    -- LOGIC LOGO CHUYỂN ĐỘNG (ANIMATION)
+    -- ====================================================================
+    local frames = {
+        "rbxthumb://type=Asset&id=139158669999658&w=150&h=150",
+        "rbxthumb://type=Asset&id=86653867257219&w=150&h=150",
+        "rbxthumb://type=Asset&id=89160708083643&w=150&h=150",
+        "rbxthumb://type=Asset&id=107610668438060&w=150&h=150"
+    }
+
+    task.spawn(function()
+        local frameIndex = 1
+        while LogoButton and LogoButton.Parent do
+            pcall(function() LogoButton.Image = frames[frameIndex] end)
+            frameIndex = frameIndex + 1
+            if frameIndex > #frames then 
+                frameIndex = 1 
+            end
+            task.wait(0.15) -- Tốc độ nhấp nháy
+        end
+    end)
+    -- ====================================================================
 
     -- Logic Kéo thả
     local isDragging = false
@@ -199,11 +233,12 @@ local function CreateIndestructibleLogo()
         end
     end)
 
-    -- Logic Tắt Mở Main Menu (của Uichill)
+    -- Logic Tắt Mở Main Menu
     LogoButton.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isDragging = false
             if dragStartPos and (input.Position - dragStartPos).Magnitude < 10 then
+                PlayClickSound() -- PHÁT ÂM THANH KHI BẤM ẨN HIỆN MENU
                 -- Tìm Main Menu (MemaybeoPremiumUI)
                 local targetUI = CoreGui:FindFirstChild("MemaybeoPremiumUI")
                 if targetUI then
@@ -433,9 +468,7 @@ t1[5].Stepped:Connect(function()
     local v127 = t3[19]
     if v127 then v127 = t3[12].Character end
     if v127 then
-        for _, descendant in ipairs(t3[12].Character:GetDescendants()) do
-            if descendant:IsA("BasePart") then descendant.CanCollide = false end
-        end
+        for _, descendant in ipairs(t3[12].Character:GetDescendants()) do if descendant:IsA("BasePart") then descendant.CanCollide = false end end
     end
     local v130 = t3[22]
     if v130 then v130 = t3[12].Character end
@@ -450,8 +483,7 @@ t1[5].Stepped:Connect(function()
     end
 end)
 t3[61] = function(p9)
-    if not t3[12].Character then return end
-    local HumanoidRootPart = t3[12].Character:FindFirstChild("HumanoidRootPart")
+    local HumanoidRootPart = t3[12].Character and t3[12].Character:FindFirstChild("HumanoidRootPart")
     if HumanoidRootPart then HumanoidRootPart.Anchored = p9 end
 end
 t3[62] = function()
@@ -475,15 +507,8 @@ t3[63] = function()
     if v162 then return false end
     local HumanoidRootPartPosition = t3[12].Character.HumanoidRootPart.Position
     for _, player in ipairs(t3[4]:GetPlayers()) do
-        if player == t3[12] then continue end
-        local v166 = not player.Team
-        if not v166 then v166 = player.Team.Name ~= t3[8] end
-        if v166 then continue end
-        local v167 = not player.Character
-        if not v167 then v167 = not player.Character:FindFirstChild("HumanoidRootPart") end
-        if v167 then continue end
-        local HumanoidRootPartPosition2 = player.Character.HumanoidRootPart.Position
-        if Vector3.new(HumanoidRootPartPosition2.X - HumanoidRootPartPosition.X, 0, HumanoidRootPartPosition2.Z - HumanoidRootPartPosition.Z).Magnitude <= 30 then return true end
+        if player == t3[12] or (player.Team and player.Team.Name == t3[8]) or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then continue end
+        if Vector3.new(player.Character.HumanoidRootPart.Position.X - HumanoidRootPartPosition.X, 0, player.Character.HumanoidRootPart.Position.Z - HumanoidRootPartPosition.Z).Magnitude <= 30 then return true end
     end
     return false
 end
@@ -884,9 +909,8 @@ end
 t3[90] = t1[14]
 t3[91] = t1[18]
 
--- NỐI CÁC TOGGLE CỦA TOOL VÀO MENU UICHILL
 local SecArrest = TabFarm:AddSection("Tự Động Bắt Giam")
-SecArrest:AddToggle("Tự động bắt giam", false, function(p22)
+SecArrest:AddToggle("Tự động bắt giam", false, function(p22) PlayClickSound()
     t3[18] = p22
     if t3[18] then
         local v288 = not t3[12].Team
@@ -896,69 +920,71 @@ SecArrest:AddToggle("Tự động bắt giam", false, function(p22)
 end)
 
 local SecRob = TabFarm:AddSection("Tự Động Cướp Bóc")
-SecRob:AddToggle("Tự động cướp", false, function(p23)
+SecRob:AddToggle("Tự động cướp", false, function(p23) PlayClickSound()
     t3[22] = p23
     t3[19] = p23
     if t3[22] then
+        pcall(function()
+            game.StarterGui:SetCore("SendNotification", { Title = "MEMAYBEO HUB", Text = "Vui lòng cài Graphics lên cao nhất để cướp mượt hơn!", Duration = 5 })
+        end)
         local v290 = not t3[12].Team
         if not v290 then v290 = t3[12].Team.Name ~= t3[7] end
         if v290 then pcall(function() t3[13]:FireServer("Criminal", "jobPad") end) end
         t3[62]()
     else
-        t3[61](false)
-        t3[33] = false
-        t3[31] = false
+        t3[61](false) t3[33] = false t3[31] = false
         if t3[28] then t3[28]:Destroy() end
         t3[70]()
     end
     t3[60](t3[12].Character)
 end)
-SecRob:AddToggle("Tránh Bảo vệ", true, function(p24) t3[23] = p24 end)
-SecRob:AddToggle("Tự động Rửa tiền", true, function(p25) t3[24] = p25 end)
-SecRob:AddToggle("Cách thức: Rửa tiền (Tắt=Tránh)", true, function(s) t3[26] = s and "Cashout" or "Avoid" end)
+SecRob:AddToggle("Tránh Bảo vệ", true, function(p24) PlayClickSound() t3[23] = p24 end)
+SecRob:AddToggle("Tự động Rửa tiền", true, function(p25) PlayClickSound() t3[24] = p25 end)
+SecRob:AddToggle("Cách thức: Rửa tiền (Tắt=Tránh)", true, function(s) PlayClickSound() t3[26] = s and "Cashout" or "Avoid" end)
 SecRob:AddSlider("Mức tiền Rửa", 80000, 1000000, 300000, function(p27) t3[25] = tonumber(p27) or 300000 end)
-SecRob:AddToggle("Tắt Laser Ngân hàng", false, function(p28) t3[38] = p28 end)
-SecRob:AddToggle("Cướp ATM", true, function(s) t3[29][1] = s end)
-SecRob:AddToggle("Cướp ATM Nước", true, function(s) t3[29][2] = s end)
-SecRob:AddToggle("Cướp Ngân Hàng (Beta)", false, function(s) t3[29][3] = s end)
-SecRob:AddButton("Rửa tiền Ngay", function() t3[75]() end)
+SecRob:AddToggle("Tắt Laser Ngân hàng", false, function(p28) PlayClickSound() t3[38] = p28 end)
+SecRob:AddToggle("Cướp ATM", true, function(s) PlayClickSound() t3[29][1] = s end)
+SecRob:AddToggle("Cướp ATM Nước", true, function(s) PlayClickSound() t3[29][2] = s end)
+SecRob:AddToggle("Cướp Ngân Hàng (Beta)", false, function(s) PlayClickSound() t3[29][3] = s end)
+SecRob:AddButton("Rửa tiền Ngay", function() PlayClickSound() t3[75]() end)
 
 local SecDrive = TabFarm:AddSection("Tự Động Lái Xe")
-SecDrive:AddToggle("Tự động lái xe", false, function(p31) t3[43] = p31 end)
-SecDrive:AddToggle("Tự động lái Trực thăng", false, function(p32) t3[44] = p32 end)
+SecDrive:AddToggle("Tự động lái xe", false, function(p31) PlayClickSound() t3[43] = p31 end)
+SecDrive:AddToggle("Tự động lái Trực thăng", false, function(p32) PlayClickSound() t3[44] = p32 end)
 SecDrive:AddSlider("Tốc độ Lái", 100, 750, 750, function(p33) t3[45] = tonumber(p33) or 750 end)
 
 local SecDel = TabFarm:AddSection("Tự Động Giao Hàng")
-SecDel:AddToggle("Tự động giao hàng", false, function(p34)
+SecDel:AddToggle("Tự động giao hàng (Đừng ngồi trên xe)", false, function(p34) PlayClickSound()
     t3[39] = p34
     if t3[39] then
+        pcall(function() game.StarterGui:SetCore("SendNotification", { Title = "MEMAYBEO HUB", Text = "Đừng ngồi trên xe khi dùng chức năng này", Duration = 5 }) end)
         local v306 = not t3[12].Team
         if not v306 then v306 = t3[12].Team.Name ~= t3[9] end
         if v306 then pcall(function() t3[13]:FireServer("Delivery", "jobPad") end) end
     end
 end)
 SecDel:AddSlider("Độ trễ Giao hàng", 2, 60, 5, function(p35) t3[40] = tonumber(p35) or 5 end)
-SecDel:AddToggle("Cách thức: Lướt (Tắt=Dịch chuyển)", true, function(s) t3[41] = s and "Tween" or "Teleport" end)
-SecDel:AddSlider("Tốc độ Lướt", 100, 2000, 1200, function(p37) t3[42] = tonumber(p37) or 1200 end)
+SecDel:AddToggle("Cách thức: Lướt (Tắt=Dịch chuyển)", true, function(s) PlayClickSound() t3[41] = s and "Tween" or "Teleport" end)
+SecDel:AddSlider("Tốc độ Lướt (Tween Speed)", 100, 2000, 1200, function(p37) t3[42] = tonumber(p37) or 1200 end)
 
 local SecMisc = TabMisc:AddSection("Các Chức Năng Khác")
-SecMisc:AddButton("Vào Nhóm (Từ mục chọn bên dưới)", function()
+SecMisc:AddButton("Vào Nhóm (Từ mục chọn bên dưới)", function() PlayClickSound()
     pcall(function()
         local v524 = t3[47] ~= "Outlaw" and (t3[47] ~= "Delivery Driver" and "Security" or "Delivery") or "Criminal"
         t3[13]:FireServer(v524, "jobPad")
     end)
 end)
-SecMisc:AddToggle("Chọn Nhóm: Bảo Vệ", true, function(s) if s then t3[47] = "Security" end end)
-SecMisc:AddToggle("Chọn Nhóm: Tội Phạm", false, function(s) if s then t3[47] = "Outlaw" end end)
-SecMisc:AddToggle("Chọn Nhóm: Giao Hàng", false, function(s) if s then t3[47] = "Delivery Driver" end end)
+SecMisc:AddToggle("Chọn Nhóm: Bảo Vệ", true, function(s) PlayClickSound() if s then t3[47] = "Security" end end)
+SecMisc:AddToggle("Chọn Nhóm: Tội Phạm", false, function(s) PlayClickSound() if s then t3[47] = "Outlaw" end end)
+SecMisc:AddToggle("Chọn Nhóm: Giao Hàng", false, function(s) PlayClickSound() if s then t3[47] = "Delivery Driver" end end)
 
-SecMisc:AddButton("Mua 10 Hộp Phụ Tùng", function()
+SecMisc:AddButton("Mua 10 Hộp Phụ Tùng", function() PlayClickSound()
     pcall(function()
         local t15 = { "TenTuningKits", "Cash", { Category_0 = "Crates", ShopTab = "Cash", Source = "Shop", DoNotifySuccess = false, PurchaseId = "CD481A2B-B41C-4EC5-A236-65E1562A3F33", Category_1 = "TuningKits" } }
         t3[17]:InvokeServer(v2(t15))
     end)
 end)
-SecMisc:AddButton("Mở tất cả Hộp Phụ Tùng", function()
+SecMisc:AddButton("Mở tất cả Hộp Phụ Tùng", function() PlayClickSound()
     pcall(function()
         local num = tonumber((game:GetService("Players").LocalPlayer.PlayerGui.PartsInventory.GenericInventory.MainFrame.Menus.LootboxInventoryUI.Holder.View.Items.Container.Pack_Parts_Store.Holder.Container.Quantity.TextLabel.Text:gsub("%D", "")))
         if not num or num <= 0 then return end
@@ -967,7 +993,7 @@ SecMisc:AddButton("Mở tất cả Hộp Phụ Tùng", function()
     end)
 end)
 
-SecMisc:AddToggle("Chống Kích AFK", false, function(p39) t3[46] = p39 end)
+SecMisc:AddToggle("Chống Kích AFK", false, function(p39) PlayClickSound() t3[46] = p39 end)
 
 t3[93] = function(p40)
     local u317 = false
@@ -990,13 +1016,12 @@ end
 t3[94] = function(p41, p42)
     if not t3[49] then return end
     if t3[50] == "Serverhop" then
+        pcall(function() game.StarterGui:SetCore("SendNotification", { Title = "Chống Admin", Text = "Phát hiện Admin " .. p41.Name .. " - Đang đổi Server!", Duration = 5 }) end)
         task.wait(1)
         task.spawn(function()
             local n7 = 0
             while true do
-                local ok, result = pcall(function()
-                    return t3[59]:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-                end)
+                local ok, result = pcall(function() return t3[59]:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")) end)
                 if ok and result and result.data then
                     local JobId = game.JobId
                     local t19 = {}
@@ -1023,9 +1048,10 @@ t3[94] = function(p41, p42)
         end)
         return
     end
+    pcall(function() game.StarterGui:SetCore("SendNotification", { Title = "Chống Admin", Text = "Phát hiện Admin " .. p41.Name, Duration = 10 }) end)
 end
 
-SecMisc:AddToggle("Chống Admin (An Toàn)", false, function(p43)
+SecMisc:AddToggle("Chống Admin (An Toàn)", false, function(p43) PlayClickSound()
     t3[49] = p43
     if t3[49] then
         task.spawn(function()
@@ -1038,7 +1064,7 @@ SecMisc:AddToggle("Chống Admin (An Toàn)", false, function(p43)
     end
 end)
 
-SecMisc:AddToggle("Cách chống: Đổi Server (Tắt=Thông báo)", false, function(s) t3[50] = s and "Serverhop" or "Notify" end)
+SecMisc:AddToggle("Cách chống: Đổi Server (Tắt=Thông báo)", false, function(s) PlayClickSound() t3[50] = s and "Serverhop" or "Notify" end)
 
 t3[4].PlayerAdded:Connect(function(player)
     if not t3[49] then return end
@@ -1049,7 +1075,7 @@ t3[4].PlayerAdded:Connect(function(player)
 end)
 
 local SecHop = TabMisc:AddSection("Đổi Máy Chủ (Server Hop)")
-SecHop:AddButton("Đổi Server Ngay", function()
+SecHop:AddButton("Đổi Server Ngay", function() PlayClickSound()
     task.spawn(function()
         local n8 = 0
         while true do
@@ -1082,7 +1108,7 @@ SecHop:AddButton("Đổi Server Ngay", function()
     end)
 end)
 
-SecHop:AddToggle("Tự động Đổi Server", false, function(p46)
+SecHop:AddToggle("Tự động Đổi Server", false, function(p46) PlayClickSound()
     t3[35] = p46
     if p46 then t3[37] = tick() end
 end)
@@ -1708,4 +1734,3 @@ task.spawn(function()
         end
     end
 end)
-
