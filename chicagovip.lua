@@ -1470,3 +1470,332 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
+
+--================================================================
+-- PHẦN BỔ SUNG MỚI - GIỮ NGUYÊN 100% CHỨC NĂNG GỐC, CHỈ THÊM:
+--   1. SPINBOT V4 (xoay nhân vật, chống khóa hướng khi cầm súng)
+--   2. ĐỔI MÀU ĐẠN (neon, mặc định ĐỎ, 8 màu chọn được)
+--   3. KHỐI ĐẠN TO HƠN (slider chỉnh lần kích thước)
+--   4. HIỆU ỨNG PHÁT SÁNG ĐẸP (neon glow + đèn cho đạn)
+--   5. ĐỔI SKIN MÀU SÚNG (súng đổi màu neon như skin)
+--================================================================
+
+local ExtraConfig = {
+    Spinbot          = false,                      -- BẬT/TẮT SPINBOT
+    SpinbotAngular   = false,                      -- Thêm lực xoay vật lý (nếu vẫn bị khóa hướng)
+    BulletColor      = false,                      -- BẬT/TẮT ĐỔI MÀU ĐẠN
+    BulletColorValue = Color3.fromRGB(255, 0, 0),  -- Màu đạn: ĐỎ
+    BulletBig        = false,                      -- BẬT/TẮT ĐẠN TO HƠN
+    BulletScale      = 6,                          -- Đạn to gấp mấy lần
+    BulletGlow       = false,                      -- BẬT/TẮT HIỆU ỨNG PHÁT SÁNG
+    GunSkin          = false,                      -- BẬT/TẮT ĐỔI SKIN MÀU SÚNG
+    GunSkinColor     = Color3.fromRGB(255, 200, 40) -- Skin súng: VÀNG GOLD
+}
+
+--================================================
+-- 1) SPINBOT V4: XOAY NHÂN VẬT TỐC ĐỘ CAO
+--================================================
+
+MiscTab:AddToggle("Bật Spinbot (Xoay Người Tốc Độ Cao)", false, function(state)
+    ExtraConfig.Spinbot = state
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.AutoRotate = not state
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    if ExtraConfig.Spinbot then
+        hum.AutoRotate = false
+    end
+end)
+
+-- Tốc độ xoay từng tầng (độ/frame) - chỉnh thoải mái
+local SPIN_STEPPED   = 38
+local SPIN_HEARTBEAT = 22
+local SPIN_RENDER    = 15
+local SPIN_MOTOR     = 25
+
+-- Tìm khớp gốc nối HumanoidRootPart với thân người (R15: Root | R6: RootJoint)
+local function GetRootMotor(char)
+    if not char then return nil end
+    local lowerTorso = char:FindFirstChild("LowerTorso")
+    if lowerTorso then
+        local m = lowerTorso:FindFirstChild("Root")
+        if m and m:IsA("Motor6D") then return m end
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local m = hrp:FindFirstChild("RootJoint")
+        if m and m:IsA("Motor6D") then return m end
+    end
+    return nil
+end
+
+-- TIÊU DIỆT lực khóa hướng: quét HRP + Thân + Súng đang cầm
+local function KillLockForces(char)
+    local hrp   = char and char:FindFirstChild("HumanoidRootPart")
+    local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+    local tool  = char and char:FindFirstChildOfClass("Tool")
+    for _, container in ipairs({hrp, torso, tool}) do
+        if container then
+            for _, obj in ipairs(container:GetChildren()) do
+                if obj:IsA("BodyGyro") or obj:IsA("BodyAngularVelocity") then
+                    obj:Destroy()
+                elseif obj:IsA("AlignOrientation") then
+                    obj.Enabled = false
+                end
+            end
+        end
+    end
+end
+
+local function SpinbotActive()
+    local char = LocalPlayer.Character
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    return ExtraConfig.Spinbot and hrp and hum and hum.Health > 0 and not hum.Sit, hrp, hum, char
+end
+
+-- TẦNG 1: HEARTBEAT - xoay ngay SAU bước vật lý (thắng script súng reset hướng)
+RunService.Heartbeat:Connect(function()
+    local active, hrp = SpinbotActive()
+    if active then
+        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SPIN_HEARTBEAT), 0)
+    end
+end)
+
+-- TẦNG 2: STEPPED - xoay TRƯỚC bước vật lý + tiêu diệt lực khóa hướng
+RunService.Stepped:Connect(function()
+    local active, hrp, hum, char = SpinbotActive()
+    if active then
+        if hum.AutoRotate then hum.AutoRotate = false end
+        KillLockForces(char)
+        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SPIN_STEPPED), 0)
+        if ExtraConfig.SpinbotAngular then
+            hrp.AssemblyAngularVelocity = Vector3.new(0, 55, 0)
+        end
+    end
+end)
+
+-- TẦNG 3: RENDERSTEP ưu tiên 7000 - xoay CUỐI CÙNG trước khi vẽ hình
+pcall(function() RunService:UnbindFromRenderStep("SpinbotRender") end)
+RunService:BindToRenderStep("SpinbotRender", Enum.RenderPriority.Last.Value + 5000, function()
+    local active, hrp, hum, char = SpinbotActive()
+    if active then
+        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SPIN_RENDER), 0)
+        -- Xoay thêm khớp gốc thân: thắng game neo THÂN NGƯỜI theo camera khi cầm súng
+        local motor = GetRootMotor(char)
+        if motor then
+            motor.Transform = motor.Transform * CFrame.Angles(0, math.rad(SPIN_MOTOR), 0)
+        end
+    end
+end)
+
+--================================================
+-- 2+3+4) ĐẠN ĐẸP: ĐỔI MÀU + ĐẠN TO + HIỆU ỨNG PHÁT SÁNG
+--================================================
+
+local BulletColors = {
+    ["Đỏ"]    = Color3.fromRGB(255, 0, 0),
+    ["Cam"]   = Color3.fromRGB(255, 130, 0),
+    ["Vàng"]  = Color3.fromRGB(255, 255, 0),
+    ["Lục"]   = Color3.fromRGB(0, 255, 60),
+    ["Lam"]   = Color3.fromRGB(0, 150, 255),
+    ["Tím"]   = Color3.fromRGB(170, 0, 255),
+    ["Hồng"]  = Color3.fromRGB(255, 70, 180),
+    ["Trắng"] = Color3.fromRGB(255, 255, 255)
+}
+
+local function IsBulletName(name)
+    name = name:lower()
+    return name:find("bullet") ~= nil or name:find("visual") ~= nil
+end
+
+-- Xử lý 1 object đạn/hiệu ứng mới xuất hiện
+local function HandleNewBullet(obj)
+    -- Đạn dạng vệt tia / tia sáng / hạt
+    if obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("ParticleEmitter") then
+        if ExtraConfig.BulletColor then
+            obj.Color = ColorSequence.new(ExtraConfig.BulletColorValue)
+        end
+        if ExtraConfig.BulletGlow then
+            pcall(function()
+                obj.LightEmission = 1
+                obj.LightInfluence = 0
+            end)
+        end
+    elseif obj:IsA("BasePart") and IsBulletName(obj.Name) then
+        -- Đạn dạng khối tròn/sợi
+        if ExtraConfig.BulletColor then
+            obj.Color = ExtraConfig.BulletColorValue
+            obj.Material = Enum.Material.Neon
+        end
+        if ExtraConfig.BulletBig then
+            local s = obj.Size
+            local k = ExtraConfig.BulletScale
+            obj.Size = Vector3.new(
+                math.clamp(s.X * k, 0.05, 200),
+                math.clamp(s.Y * k, 0.05, 200),
+                math.clamp(s.Z * k, 0.05, 200)
+            )
+        end
+        if ExtraConfig.BulletGlow then
+            if not obj:FindFirstChildOfClass("PointLight") then
+                local light = Instance.new("PointLight")
+                light.Color = ExtraConfig.BulletColorValue
+                light.Brightness = 3
+                light.Range = 14
+                light.Parent = obj
+            end
+        end
+        -- Bắt luôn vệt/hạt con sinh ra sau part đạn
+        obj.ChildAdded:Connect(function(child)
+            pcall(HandleNewBullet, child)
+        end)
+    end
+end
+
+-- Tô lại đạn/hiệu ứng đã có sẵn khi vừa bật hoặc đổi màu
+local function RescanBullets()
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            HandleNewBullet(obj)
+        end
+    end)
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+    if ExtraConfig.BulletColor or ExtraConfig.BulletGlow or ExtraConfig.BulletBig then
+        pcall(HandleNewBullet, obj)
+    end
+end)
+
+MiscTab:AddToggle("Bật Đổi Màu Đạn (Hiệu Ứng Màu)", false, function(state)
+    ExtraConfig.BulletColor = state
+    if state then RescanBullets() end
+end)
+
+MiscTab:AddDropdown("Chọn Màu Đạn", {"Đỏ", "Cam", "Vàng", "Lục", "Lam", "Tím", "Hồng", "Trắng"}, "Đỏ", function(choice)
+    ExtraConfig.BulletColorValue = BulletColors[choice] or BulletColors["Đỏ"]
+    if ExtraConfig.BulletColor then RescanBullets() end
+end)
+
+MiscTab:AddToggle("Khối Đạn To Hơn (Đạn Lớn Xấu Ác)", false, function(state)
+    ExtraConfig.BulletBig = state
+    if state then RescanBullets() end
+end)
+
+MiscTab:AddSlider("Độ To Của Đạn (Lần Kích Thước)", 1, 20, 6, function(v)
+    ExtraConfig.BulletScale = v
+end)
+
+MiscTab:AddToggle("Hiệu Ứng Phát Sáng Đẹp (Neon Glow)", false, function(state)
+    ExtraConfig.BulletGlow = state
+    if state then RescanBullets() end
+end)
+
+--================================================
+-- 5) ĐỔI SKIN MÀU SÚNG (SÚNG ĐỔI MÀU NEON NHƯ SKIN)
+--================================================
+
+local GunSkinColors = {
+    ["Vàng Gold"]  = Color3.fromRGB(255, 200, 40),
+    ["Đỏ Blood"]   = Color3.fromRGB(255, 40, 40),
+    ["Xanh Neon"]  = Color3.fromRGB(0, 170, 255),
+    ["Tím Galaxy"] = Color3.fromRGB(150, 60, 255),
+    ["Bạc Lạnh"]   = Color3.fromRGB(205, 210, 225),
+    ["Hồng Candy"] = Color3.fromRGB(255, 100, 200),
+    ["Xanh Lá"]    = Color3.fromRGB(60, 255, 120),
+    ["Trắng Ngọc"] = Color3.fromRGB(245, 245, 255)
+}
+
+-- Ghi nhớ màu gốc để tắt là phục hồi như cũ
+local GunSkinOriginals = setmetatable({}, {__mode = "k"})
+
+-- Gom part súng: súng trên người + viewmodel góc nhìn thứ nhất trong Camera
+local function CollectGunParts()
+    local parts = {}
+    local char = LocalPlayer.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if not tool then return parts end
+    for _, p in ipairs(tool:GetDescendants()) do
+        if p:IsA("BasePart") then table.insert(parts, p) end
+    end
+    local cam = workspace.CurrentCamera
+    if cam then
+        local toolName = tool.Name:lower()
+        for _, m in ipairs(cam:GetChildren()) do
+            if m:IsA("Model") then
+                local n = m.Name:lower()
+                if n:find("arms") or n:find("view") or n:find(toolName) or m:FindFirstChildOfClass("Humanoid") then
+                    for _, p in ipairs(m:GetDescendants()) do
+                        if p:IsA("BasePart") then table.insert(parts, p) end
+                    end
+                end
+            end
+        end
+    end
+    return parts
+end
+
+local function ApplyGunSkin()
+    if not ExtraConfig.GunSkin then return end
+    for _, p in ipairs(CollectGunParts()) do
+        if not GunSkinOriginals[p] then
+            GunSkinOriginals[p] = {Color = p.Color, Material = p.Material}
+        end
+        p.Color = ExtraConfig.GunSkinColor
+        p.Material = Enum.Material.Neon
+    end
+end
+
+local function RestoreGunSkin()
+    for p, props in pairs(GunSkinOriginals) do
+        pcall(function()
+            if p and p.Parent then
+                p.Color = props.Color
+                p.Material = props.Material
+            end
+        end)
+        GunSkinOriginals[p] = nil
+    end
+end
+
+MiscTab:AddToggle("Đổi Skin Màu Súng (Neon)", false, function(state)
+    ExtraConfig.GunSkin = state
+    if state then
+        ApplyGunSkin()
+    else
+        RestoreGunSkin()
+    end
+end)
+
+MiscTab:AddDropdown("Màu Skin Súng", {"Vàng Gold", "Đỏ Blood", "Xanh Neon", "Tím Galaxy", "Bạc Lạnh", "Hồng Candy", "Xanh Lá", "Trắng Ngọc"}, "Vàng Gold", function(choice)
+    ExtraConfig.GunSkinColor = GunSkinColors[choice] or GunSkinColors["Vàng Gold"]
+    if ExtraConfig.GunSkin then ApplyGunSkin() end
+end)
+
+-- Vòng lặp giữ skin: súng mới cầm / respawn vẫn được tô màu
+task.spawn(function()
+    while task.wait(1) do
+        if ExtraConfig.GunSkin then
+            pcall(ApplyGunSkin)
+        end
+    end
+end)
+
+local function HookCharacterForSkin(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and ExtraConfig.GunSkin then
+            task.wait(0.3) -- đợi súng load xong rồi tô
+            pcall(ApplyGunSkin)
+        end
+    end)
+end
+if LocalPlayer.Character then
+    HookCharacterForSkin(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(HookCharacterForSkin)
