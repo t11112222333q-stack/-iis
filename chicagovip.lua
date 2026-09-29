@@ -1,9 +1,9 @@
 --[[
-	ИНТЕГРАЦИЯ FAKELAG С ОПЦИЕЙ ОТОБРАЖЕНИЯ И ИСПРАВЛЕННЫМ HITBOX
-	УДАЛЕНЫ ФУНКЦИИ: INFINITE JUMP, AIM REQUIRE WEAPON, TEAM CHECK
-	ДОБАВЛЕНО: ПЛАВНОЕ УСКОРЕНИЕ (ОБХОД АНТИЧИТА НА СКОРОСТЬ)
-	ИЗМЕНЕНИЯ: СКОРОСТЬ ЗАФИКСИРОВАНА НА 24, ПОЛЗУНОК УДАЛЕН
-	БЫЛО ДОБАВЛЕНО: SAFEZONE EXPANDER (ВКЛЮЧЕНИЕ ЩИТА НА ВСЕЙ КАРТЕ)
+        ИНТЕГРАЦИЯ FAKELAG С ОПЦИЕЙ ОТОБРАЖЕНИЯ И ИСПРАВЛЕННЫМ HITBOX
+        УДАЛЕНЫ ФУНКЦИИ: INFINITE JUMP, AIM REQUIRE WEAPON, TEAM CHECK
+        ДОБАВЛЕНО: ПЛАВНОЕ УСКОРЕНИЕ (ОБХОД АНТИЧИТА НА СКОРОСТЬ)
+        ИЗМЕНЕНИЯ: СКОРОСТЬ ЗАФИКСИРОВАНА НА 24, ПОЛЗУНОК УДАЛЕН
+        БЫЛО ДОБАВЛЕНО: SAFEZONE EXPANDER (ВКЛЮЧЕНИЕ ЩИТА НА ВСЕЙ КАРТЕ)
     CẬP NHẬT MỚI: TÍCH HỢP INVISIBLE TOUCH FLING THEO YÊU CẦU CỦA BẠN & ANTI-FLING
 ]]
 
@@ -318,8 +318,8 @@ function Library:CreateWindow(titleText)
     MakeDraggable(ToggleBtn, ToggleBtn)
 
     local MainFrame = Instance.new("Frame", ScreenGui)
-    MainFrame.Size = UDim2.new(0, 620, 0, 480)
-    MainFrame.Position = UDim2.new(0.5, -310, 0.5, -240)
+    MainFrame.Size = UDim2.new(0, 520, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -260, 0.5, -200)
     MainFrame.BackgroundColor3 = Colors.MainBg
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -401,9 +401,9 @@ function Library:CreateWindow(titleText)
         MenuOpen = not MenuOpen
         if MenuOpen then
             MainFrame.Visible = true
-            TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 620, 0, 480), Position = UDim2.new(0.5, -310, 0.5, -240)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 400), Position = UDim2.new(0.5, -260, 0.5, -200)}):Play()
         else
-            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 620, 0, 0), Position = UDim2.new(0.5, -310, 0.5, 0)}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0), Position = UDim2.new(0.5, -260, 0.5, 0)}):Play()
             task.delay(0.3, function() if not MenuOpen then MainFrame.Visible = false end end)
         end
     end)
@@ -1477,7 +1477,9 @@ end)
 --   2. ĐỔI MÀU ĐẠN (neon, mặc định ĐỎ, 8 màu chọn được)
 --   3. KHỐI ĐẠN TO HƠN (slider chỉnh lần kích thước)
 --   4. HIỆU ỨNG PHÁT SÁNG ĐẸP (neon glow + đèn cho đạn)
---   5. ĐỔI SKIN MÀU SÚNG (súng đổi màu neon như skin)
+--   5. SKIN SÚNG VIP (16 skin + hạt bọc súng + GLOW/TRAIL/PULSE)
+--   6. VÔ HẠN ĐẠN (thử nghiệm - ăn nếu game giữ đạn phía client)
+--   7. THU NHỎ MENU (620x480 -> 520x400)
 --================================================================
 
 local ExtraConfig = {
@@ -1488,8 +1490,14 @@ local ExtraConfig = {
     BulletBig        = false,                      -- BẬT/TẮT ĐẠN TO HƠN
     BulletScale      = 6,                          -- Đạn to gấp mấy lần
     BulletGlow       = false,                      -- BẬT/TẮT HIỆU ỨNG PHÁT SÁNG
-    GunSkin          = false,                      -- BẬT/TẮT ĐỔI SKIN MÀU SÚNG
-    GunSkinColor     = Color3.fromRGB(255, 200, 40) -- Skin súng: VÀNG GOLD
+    GunSkin          = false,                      -- BẬT/TẮT SKIN SÚNG VIP
+    GunSkinName      = "Vàng Gold",                -- Skin đang chọn (16 loại)
+    GunSkinRainbow   = false,                      -- Đang ở skin Cầu Vòng?
+    SkinGlow         = false,                      -- GLOW: ánh sáng tỏa quanh súng
+    SkinTrail        = false,                      -- TRAIL: vệt sáng khi vung súng
+    SkinPulse        = false,                      -- PULSE: súng phồng xẹp theo nhịp
+    SkinParticle     = "TẮT",                      -- Hạt bọc súng: TẮT/SAO/LỬA/BỤI VÀNG/TÍM
+    SkinTocDo        = 1                           -- Tốc độ quay cầu vòng
 }
 
 --================================================
@@ -1698,104 +1706,439 @@ MiscTab:AddToggle("Hiệu Ứng Phát Sáng Đẹp (Neon Glow)", false, function
 end)
 
 --================================================
--- 5) ĐỔI SKIN MÀU SÚNG (SÚNG ĐỔI MÀU NEON NHƯ SKIN)
+-- 5) SKIN SÚNG VIP + HIỆU ỨNG (VER 2 - thay skin màu cũ)
+--    16 skin: 8 màu neon + 8 đặc biệt (cầu vòng, holy, pha lê...)
+--    Hiệu ứng: 4 loại hạt bọc súng + GLOW + TRAIL + PULSE
+--    Phủ TOÀN BỘ part thân súng + viewmodel góc nhìn thứ nhất
+--    100% LOCAL - chỉ đổi hình ảnh trên máy mình -> KHÔNG KICK
 --================================================
 
-local GunSkinColors = {
-    ["Vàng Gold"]  = Color3.fromRGB(255, 200, 40),
-    ["Đỏ Blood"]   = Color3.fromRGB(255, 40, 40),
-    ["Xanh Neon"]  = Color3.fromRGB(0, 170, 255),
-    ["Tím Galaxy"] = Color3.fromRGB(150, 60, 255),
-    ["Bạc Lạnh"]   = Color3.fromRGB(205, 210, 225),
-    ["Hồng Candy"] = Color3.fromRGB(255, 100, 200),
-    ["Xanh Lá"]    = Color3.fromRGB(60, 255, 120),
-    ["Trắng Ngọc"] = Color3.fromRGB(245, 245, 255)
+local KHO_SKIN = {
+    ["Máu Đỏ Blood"]    = { mausac = Color3.fromRGB(255, 0, 60) },
+    ["Hồng Neon"]       = { mausac = Color3.fromRGB(255, 45, 150) },
+    ["Cam Solar"]       = { mausac = Color3.fromRGB(255, 120, 0) },
+    ["Vàng Gold"]       = { mausac = Color3.fromRGB(255, 200, 40) },
+    ["Xanh Mint"]       = { mausac = Color3.fromRGB(0, 255, 160) },
+    ["Xanh Electric"]   = { mausac = Color3.fromRGB(0, 170, 255) },
+    ["Tím Galaxy"]      = { mausac = Color3.fromRGB(150, 60, 255) },
+    ["Trắng Ngọc"]      = { mausac = Color3.fromRGB(235, 245, 255) },
+    ["Cầu Vòng 7 Màu"]  = { rainbow = true, vatlieu = Enum.Material.Neon },
+    ["Holy White"]      = { vatlieu = Enum.Material.ForceField, mausac = Color3.fromRGB(255, 255, 255) },
+    ["Holy Tím"]        = { vatlieu = Enum.Material.ForceField, mausac = Color3.fromRGB(150, 80, 255) },
+    ["Pha Lê Băng"]     = { vatlieu = Enum.Material.Glass, mausac = Color3.fromRGB(90, 220, 255), trongSuot = 0.35, phanChieu = 0.25 },
+    ["Vàng Kim Cương"]  = { vatlieu = Enum.Material.Metal, mausac = Color3.fromRGB(255, 195, 40), phanChieu = 0.5 },
+    ["Thép Galvanized"] = { vatlieu = Enum.Material.DiamondPlate, mausac = Color3.fromRGB(190, 200, 215) },
+    ["Xanh Độc Toxic"]  = { vatlieu = Enum.Material.Neon, mausac = Color3.fromRGB(70, 255, 60) },
+    ["Lava Địa Ngục"]   = { vatlieu = Enum.Material.Neon, mausac = Color3.fromRGB(255, 70, 0) },
 }
 
--- Ghi nhớ màu gốc để tắt là phục hồi như cũ
-local GunSkinOriginals = setmetatable({}, {__mode = "k"})
+-- Texture hạt dùng file CÓ SẴN trong Roblox (rbxasset://) nên không bao giờ lỗi ảnh
+local KHO_HAT = {
+    ["SAO"]      = { texture = "rbxasset://textures/particles/sparkles_main.dds", mau = Color3.fromRGB(170, 225, 255), kichThuoc = 0.25, tocDo = 2,   tuoiTho = 0.8, tiLe = 18 },
+    ["LỬA"]      = { texture = "rbxasset://textures/particles/fire_main.dds",     mau = Color3.fromRGB(255, 130, 30),  kichThuoc = 0.40, tocDo = 3,   tuoiTho = 0.6, tiLe = 24 },
+    ["BỤI VÀNG"] = { texture = "rbxasset://textures/particles/smoke_main.dds",    mau = Color3.fromRGB(255, 205, 70),  kichThuoc = 0.20, tocDo = 1.2, tuoiTho = 1.1, tiLe = 14 },
+    ["TÍM"]      = { texture = "rbxasset://textures/particles/sparkles_main.dds", mau = Color3.fromRGB(195, 85, 255),  kichThuoc = 0.30, tocDo = 1.6, tuoiTho = 0.9, tiLe = 16 },
+}
 
--- Gom part súng: súng trên người + viewmodel góc nhìn thứ nhất trong Camera
-local function CollectGunParts()
-    local parts = {}
+local LUU_GOC  = setmetatable({}, {__mode = "k"})   -- [part] thuộc tính gốc để khôi phục
+local HIEU_UNG = setmetatable({}, {__mode = "k"})   -- [handle] hiệu ứng đang gắn
+local DANH_SACH_PART   = {}                         -- part thân súng + viewmodel (tô skin)
+local DANH_SACH_HANDLE = {}                         -- Handle (neo hiệu ứng)
+local SKIN_HIEN_TAI    = nil
+
+local function LayHandleSung()
+    local ketQua = {}
     local char = LocalPlayer.Character
-    local tool = char and char:FindFirstChildOfClass("Tool")
-    if not tool then return parts end
-    for _, p in ipairs(tool:GetDescendants()) do
-        if p:IsA("BasePart") then table.insert(parts, p) end
+    if not char then return ketQua end
+    for _, con in ipairs(char:GetChildren()) do
+        if con:IsA("Tool") then
+            local handle = con:FindFirstChild("Handle")
+            if handle and handle:IsA("BasePart") then
+                table.insert(ketQua, handle)
+            end
+        end
     end
+    return ketQua
+end
+
+local function LayPartSung()
+    local ketQua = {}
+    local char = LocalPlayer.Character
+    if not char then return ketQua end
+    for _, con in ipairs(char:GetChildren()) do
+        if con:IsA("Tool") then
+            for _, p in ipairs(con:GetDescendants()) do
+                if p:IsA("BasePart") then table.insert(ketQua, p) end
+            end
+        end
+    end
+    return ketQua
+end
+
+-- Lọc tay người (không tô tay viewmodel)
+local function LaPartTay(p)
+    local n = p.Name:lower()
+    return n:find("arm", 1, true) ~= nil or n:find("hand", 1, true) ~= nil
+        or n:find("finger", 1, true) ~= nil or n:find("sleeve", 1, true) ~= nil
+end
+
+local function CoHumanoid(obj, cam)
+    local cur = obj
+    while cur and cur ~= cam do
+        if cur:FindFirstChildOfClass("Humanoid") then return true end
+        cur = cur.Parent
+    end
+    return false
+end
+
+local function LayPartViewModel()
+    local ketQua = {}
     local cam = workspace.CurrentCamera
-    if cam then
-        local toolName = tool.Name:lower()
-        for _, m in ipairs(cam:GetChildren()) do
-            if m:IsA("Model") then
-                local n = m.Name:lower()
-                if n:find("arms") or n:find("view") or n:find(toolName) or m:FindFirstChildOfClass("Humanoid") then
-                    for _, p in ipairs(m:GetDescendants()) do
-                        if p:IsA("BasePart") then table.insert(parts, p) end
-                    end
+    if not cam then return ketQua end
+    for _, p in ipairs(cam:GetDescendants()) do
+        if p:IsA("BasePart") and not LaPartTay(p) and not CoHumanoid(p, cam) then
+            table.insert(ketQua, p)
+        end
+    end
+    return ketQua
+end
+
+local function NoiDanhSach(danhSach, them)
+    for _, moi in ipairs(them) do
+        local daCo = false
+        for _, cu in ipairs(danhSach) do
+            if cu == moi then daCo = true break end
+        end
+        if not daCo then table.insert(danhSach, moi) end
+    end
+end
+
+local function LayMauVertex(mau)
+    return Vector3.new(mau.R, mau.G, mau.B)
+end
+
+local function LuuGocPart(p)
+    if LUU_GOC[p] then return end
+    local t = {
+        Material = p.Material, Color = p.Color,
+        Transparency = p.Transparency, Reflectance = p.Reflectance,
+        KichThuoc = p.Size, Mesh = p:FindFirstChildOfClass("SpecialMesh"),
+    }
+    if p:IsA("MeshPart") then t.TextureID = p.TextureID end
+    if t.Mesh then
+        t.MeshTextureId = t.Mesh.TextureId
+        t.VertexColor = t.Mesh.VertexColor
+    end
+    LUU_GOC[p] = t
+end
+
+local function ToMauPart(p, mau)
+    p.Color = mau
+    local goc = LUU_GOC[p]
+    if goc and goc.Mesh then goc.Mesh.VertexColor = LayMauVertex(mau) end
+end
+
+local function XoaHieuUng(handle)
+    for _, ten in ipairs({"SG_Glow", "SG_Trail", "SG_A0", "SG_A1", "SG_Particle"}) do
+        local o = handle:FindFirstChild(ten)
+        if o then o:Destroy() end
+    end
+    HIEU_UNG[handle] = nil
+end
+
+local function TaoHieuUng(handle)
+    XoaHieuUng(handle)
+    local d = {}
+    local skin = SKIN_HIEN_TAI
+    local mauHienTai = (skin and skin.mausac) or Color3.fromRGB(0, 255, 200)
+
+    if ExtraConfig.SkinGlow then
+        local den = Instance.new("PointLight")
+        den.Name = "SG_Glow"
+        den.Color = mauHienTai
+        den.Brightness = 3
+        den.Range = 14
+        den.Parent = handle
+        d.Light = den
+    end
+
+    if ExtraConfig.SkinTrail then
+        local a0 = Instance.new("Attachment")
+        a0.Name = "SG_A0"
+        a0.Position = Vector3.new(0, handle.Size.Y * 0.5, 0)
+        a0.Parent = handle
+        local a1 = Instance.new("Attachment")
+        a1.Name = "SG_A1"
+        a1.Position = Vector3.new(0, -handle.Size.Y * 0.5, 0)
+        a1.Parent = handle
+        local trail = Instance.new("Trail")
+        trail.Name = "SG_Trail"
+        trail.Attachment0 = a0
+        trail.Attachment1 = a1
+        trail.Lifetime = 0.3
+        trail.LightEmission = 1
+        trail.FaceCamera = true
+        trail.Color = ColorSequence.new(mauHienTai)
+        trail.Transparency = NumberSequence.new(0.1, 1)
+        trail.WidthScale = NumberSequence.new(1, 0)
+        trail.Parent = handle
+        d.Trail = trail
+    end
+
+    local tenHat = ExtraConfig.SkinParticle
+    if tenHat and tenHat ~= "TẮT" and KHO_HAT[tenHat] then
+        local pre = KHO_HAT[tenHat]
+        local hat = Instance.new("ParticleEmitter")
+        hat.Name = "SG_Particle"
+        hat.Texture = pre.texture
+        hat.Color = ColorSequence.new(pre.mau)
+        hat.Rate = pre.tiLe
+        hat.Lifetime = NumberRange.new(pre.tuoiTho * 0.6, pre.tuoiTho)
+        hat.Speed = NumberRange.new(pre.tocDo * 0.5, pre.tocDo)
+        hat.SpreadAngle = Vector2.new(180, 180)
+        hat.Size = NumberSequence.new(pre.kichThuoc, 0)
+        hat.Transparency = NumberSequence.new(0.15, 1)
+        hat.LightEmission = 1
+        hat.LightInfluence = 0
+        hat.Rotation = NumberRange.new(0, 360)
+        hat.RotSpeed = NumberRange.new(-90, 90)
+        hat.EmissionDirection = Enum.NormalId.Top
+        hat.Parent = handle
+        d.Emitter = hat
+    end
+
+    HIEU_UNG[handle] = d
+end
+
+local function ApVatLieuSkin(p, skin)
+    LuuGocPart(p)
+    p.Material = skin.vatlieu or Enum.Material.SmoothPlastic
+    p.Reflectance = skin.phanChieu or 0
+    local goc = LUU_GOC[p]
+    if goc and goc.Transparency >= 0.95 then
+        p.Transparency = goc.Transparency  -- grip vô hình giữ nguyên vô hình
+    else
+        p.Transparency = skin.trongSuot or 0
+    end
+    if not ExtraConfig.GunSkinRainbow then
+        ToMauPart(p, skin.mausac or p.Color)
+    end
+end
+
+local function ApSkinVip()
+    if not ExtraConfig.GunSkin then return end
+    local skin = KHO_SKIN[ExtraConfig.GunSkinName]
+    if not skin then return end
+    SKIN_HIEN_TAI = skin
+    ExtraConfig.GunSkinRainbow = skin.rainbow and true or false
+
+    DANH_SACH_HANDLE = LayHandleSung()
+    DANH_SACH_PART = LayPartSung()
+    NoiDanhSach(DANH_SACH_PART, LayPartViewModel())
+
+    for _, handle in ipairs(DANH_SACH_HANDLE) do
+        TaoHieuUng(handle)
+    end
+    for _, p in ipairs(DANH_SACH_PART) do
+        ApVatLieuSkin(p, skin)
+    end
+end
+
+local function KhoiPhucSung()
+    SKIN_HIEN_TAI = nil
+    ExtraConfig.GunSkinRainbow = false
+    for _, p in ipairs(DANH_SACH_PART) do
+        local goc = LUU_GOC[p]
+        if goc then
+            pcall(function()
+                p.Material = goc.Material
+                p.Color = goc.Color
+                p.Transparency = goc.Transparency
+                p.Reflectance = goc.Reflectance
+                if goc.KichThuoc then p.Size = goc.KichThuoc end
+                if goc.TextureID and p:IsA("MeshPart") then p.TextureID = goc.TextureID end
+                if goc.Mesh then
+                    if goc.MeshTextureId then goc.Mesh.TextureId = goc.MeshTextureId end
+                    if goc.VertexColor then goc.Mesh.VertexColor = goc.VertexColor end
+                end
+            end)
+        end
+    end
+    for _, handle in ipairs(DANH_SACH_HANDLE) do
+        XoaHieuUng(handle)
+    end
+end
+
+local function QuetVaApDung()
+    pcall(function()
+        -- Handle neo hiệu ứng
+        for _, handle in ipairs(LayHandleSung()) do
+            local daCo = false
+            for _, h in ipairs(DANH_SACH_HANDLE) do
+                if h == handle then daCo = true break end
+            end
+            if not daCo then
+                table.insert(DANH_SACH_HANDLE, handle)
+                if ExtraConfig.GunSkin then TaoHieuUng(handle) end
+            end
+        end
+        -- Part thân súng + viewmodel (tô skin)
+        local moi = LayPartSung()
+        NoiDanhSach(moi, LayPartViewModel())
+        for _, p in ipairs(moi) do
+            local daCo = false
+            for _, q in ipairs(DANH_SACH_PART) do
+                if q == p then daCo = true break end
+            end
+            if not daCo then
+                table.insert(DANH_SACH_PART, p)
+                if ExtraConfig.GunSkin and SKIN_HIEN_TAI then
+                    ApVatLieuSkin(p, SKIN_HIEN_TAI)
+                end
+            end
+        end
+    end)
+end
+
+MiscTab:AddToggle("Skin Súng VIP + Hiệu Ứng (16 Skin)", false, function(state)
+    ExtraConfig.GunSkin = state
+    if state then
+        ApSkinVip()
+    else
+        KhoiPhucSung()
+    end
+end)
+
+MiscTab:AddDropdown("Chọn Skin Súng", {"Máu Đỏ Blood", "Hồng Neon", "Cam Solar", "Vàng Gold", "Xanh Mint", "Xanh Electric", "Tím Galaxy", "Trắng Ngọc", "Cầu Vòng 7 Màu", "Holy White", "Holy Tím", "Pha Lê Băng", "Vàng Kim Cương", "Thép Galvanized", "Xanh Độc Toxic", "Lava Địa Ngục"}, "Vàng Gold", function(choice)
+    ExtraConfig.GunSkinName = choice
+    if ExtraConfig.GunSkin then ApSkinVip() end
+end)
+
+MiscTab:AddDropdown("Hiệu Ứng Hạt Bọc Súng", {"TẮT", "SAO", "LỬA", "BỤI VÀNG", "TÍM"}, "TẮT", function(choice)
+    ExtraConfig.SkinParticle = choice
+    if ExtraConfig.GunSkin then
+        for _, handle in ipairs(DANH_SACH_HANDLE) do
+            TaoHieuUng(handle)
+        end
+    end
+end)
+
+MiscTab:AddToggle("Glow - Ánh Sáng Tỏa Quanh Súng", false, function(state)
+    ExtraConfig.SkinGlow = state
+    if ExtraConfig.GunSkin then
+        for _, handle in ipairs(DANH_SACH_HANDLE) do
+            TaoHieuUng(handle)
+        end
+    end
+end)
+
+MiscTab:AddToggle("Trail - Vệt Sáng Khi Vung Súng", false, function(state)
+    ExtraConfig.SkinTrail = state
+    if ExtraConfig.GunSkin then
+        for _, handle in ipairs(DANH_SACH_HANDLE) do
+            TaoHieuUng(handle)
+        end
+    end
+end)
+
+MiscTab:AddToggle("Pulse - Súng Phồng Xẹp Theo Nhịp", false, function(state)
+    ExtraConfig.SkinPulse = state
+    if not state then
+        for _, handle in ipairs(DANH_SACH_HANDLE) do
+            local goc = LUU_GOC[handle]
+            if goc and goc.KichThuoc then
+                pcall(function() handle.Size = goc.KichThuoc end)
+            end
+        end
+    end
+end)
+
+MiscTab:AddSlider("Tốc Độ Cầu Vòng (x0.1 - x3)", 1, 30, 10, function(v)
+    ExtraConfig.SkinTocDo = v / 10
+end)
+
+-- Vòng lặp cầu vòng + pulse + đồng bộ màu hiệu ứng
+local MauCauVong = Color3.fromRGB(0, 255, 200)
+local thoiGian = 0
+RunService.Heartbeat:Connect(function(delta)
+    thoiGian = thoiGian + (delta * ExtraConfig.SkinTocDo)
+    local rainbow = ExtraConfig.GunSkinRainbow
+    if rainbow then
+        MauCauVong = Color3.fromHSV(thoiGian % 1, 1, 1)
+    end
+
+    -- tô màu cầu vòng cho TOÀN BỘ part thân súng
+    for i = #DANH_SACH_PART, 1, -1 do
+        local p = DANH_SACH_PART[i]
+        if not p.Parent then
+            table.remove(DANH_SACH_PART, i)
+        else
+            if rainbow then ToMauPart(p, MauCauVong) end
+        end
+    end
+
+    -- hiệu ứng + pulse gắn trên Handle
+    for i = #DANH_SACH_HANDLE, 1, -1 do
+        local handle = DANH_SACH_HANDLE[i]
+        if not handle.Parent then
+            table.remove(DANH_SACH_HANDLE, i)
+        else
+            local d = HIEU_UNG[handle]
+            if d and rainbow then
+                if d.Light then d.Light.Color = MauCauVong end
+                if d.Trail then d.Trail.Color = ColorSequence.new(MauCauVong) end
+            end
+            if ExtraConfig.SkinPulse then
+                local goc = LUU_GOC[handle]
+                if goc and goc.KichThuoc then
+                    handle.Size = goc.KichThuoc * (1 + 0.05 * math.sin(thoiGian * 4))
                 end
             end
         end
     end
-    return parts
-end
-
-local function ApplyGunSkin()
-    if not ExtraConfig.GunSkin then return end
-    for _, p in ipairs(CollectGunParts()) do
-        if not GunSkinOriginals[p] then
-            GunSkinOriginals[p] = {Color = p.Color, Material = p.Material}
-        end
-        p.Color = ExtraConfig.GunSkinColor
-        p.Material = Enum.Material.Neon
-    end
-end
-
-local function RestoreGunSkin()
-    for p, props in pairs(GunSkinOriginals) do
-        pcall(function()
-            if p and p.Parent then
-                p.Color = props.Color
-                p.Material = props.Material
-            end
-        end)
-        GunSkinOriginals[p] = nil
-    end
-end
-
-MiscTab:AddToggle("Đổi Skin Màu Súng (Neon)", false, function(state)
-    ExtraConfig.GunSkin = state
-    if state then
-        ApplyGunSkin()
-    else
-        RestoreGunSkin()
-    end
 end)
 
-MiscTab:AddDropdown("Màu Skin Súng", {"Vàng Gold", "Đỏ Blood", "Xanh Neon", "Tím Galaxy", "Bạc Lạnh", "Hồng Candy", "Xanh Lá", "Trắng Ngọc"}, "Vàng Gold", function(choice)
-    ExtraConfig.GunSkinColor = GunSkinColors[choice] or GunSkinColors["Vàng Gold"]
-    if ExtraConfig.GunSkin then ApplyGunSkin() end
-end)
-
--- Vòng lặp giữ skin: súng mới cầm / respawn vẫn được tô màu
-task.spawn(function()
-    while task.wait(1) do
-        if ExtraConfig.GunSkin then
-            pcall(ApplyGunSkin)
-        end
-    end
-end)
-
-local function HookCharacterForSkin(char)
-    char.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") and ExtraConfig.GunSkin then
-            task.wait(0.3) -- đợi súng load xong rồi tô
-            pcall(ApplyGunSkin)
+-- Tự gắn lại skin khi rút súng mới / respawn / viewmodel mới
+local function HookSkin(char)
+    char.ChildAdded:Connect(function(con)
+        if con:IsA("Tool") and ExtraConfig.GunSkin then
+            task.delay(0.3, QuetVaApDung)
         end
     end)
 end
 if LocalPlayer.Character then
-    HookCharacterForSkin(LocalPlayer.Character)
+    HookSkin(LocalPlayer.Character)
 end
-LocalPlayer.CharacterAdded:Connect(HookCharacterForSkin)
+LocalPlayer.CharacterAdded:Connect(function(char)
+    DANH_SACH_HANDLE = {}
+    DANH_SACH_PART = {}
+    task.delay(1, function()
+        QuetVaApDung()
+        HookSkin(char)
+    end)
+end)
+
+task.spawn(function()
+    while task.wait(2) do
+        if ExtraConfig.GunSkin then
+            QuetVaApDung()
+        end
+    end
+end)
+
+local function HookCamera(cam)
+    cam.DescendantAdded:Connect(function()
+        if ExtraConfig.GunSkin then
+            task.delay(0.25, QuetVaApDung)
+        end
+    end)
+end
+if workspace.CurrentCamera then
+    HookCamera(workspace.CurrentCamera)
+end
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    if workspace.CurrentCamera then
+        HookCamera(workspace.CurrentCamera)
+    end
+end)
+
