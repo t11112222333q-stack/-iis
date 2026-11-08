@@ -11263,15 +11263,7 @@ local MAIN_GAME_SCRIPT =
         end; 
         end; 
         local function b(M,F)KS(M,F and"ON"or"OFF",F and px or hS); 
-        end; Gx.fakeG=function()return false; Gx.fgAt=M+5; 
-        for M in next,Lx,nil do if type(M)=="string"then if M:find("^__ChilliV%d")then Gx.fgV=true; 
-        return true; elseif M=="__ChilliOrigQueue"then Gx.fgV=true; return true; 
-        elseif M=="__ChilliOnTpHooked"then Gx.fgV=true; return true; 
-        elseif M=="__ChilliBootQueuedSession"then Gx.fgV=true; return true; 
-        end; 
-        end; 
-        end; return Gx.fgV; 
-        end; Gx.guard=function()local M,F=i(),MS.gui; 
+        end; Gx.fakeG=function() return false; end; Gx.guard=function()local M,F=i(),MS.gui; 
         if F then if getconnections then if M<(Gx.gdAt or 0)then return; 
         end; else return; 
         end; else return; 
