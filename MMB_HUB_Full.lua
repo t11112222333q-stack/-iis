@@ -19,7 +19,7 @@ local MENU_CONFIG = {
     LanguageFile = "MMBHubLanguage.json",
     ConfigFile = "MMBHubConfigs.json",
     DiscordInvite = "https://discord.gg/xpbadexya",
-    Developer = "Akiro | MMB Hub",
+    Developer = "36 AI | MMB Hub",
 }
 
 --// Services
